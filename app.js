@@ -52,6 +52,7 @@ const FINANCE_DEFAULT_COLUMNS = [
 
 const DEMO_SOURCE = "Datos demo";
 const BUNDLED_ADVANCE_CSV = "data/avance-general.csv";
+const BUNDLED_UNIT_ADVANCE_CSV = "data/avance-por-unidad.csv";
 const BUNDLED_QUALITY_FINAL_CSV = "data/pruebas-calidad-finales.csv";
 const PUBLIC_SOURCES_URL = "data/sources.json";
 const DEFAULT_AUTO_REFRESH_MINUTES = 5;
@@ -373,6 +374,7 @@ async function loadBundledAdvanceData(force = false) {
     const data = createEmptyDataset();
     applyCsvToDataset(data, "equipos", text);
     applyCsvToDataset(data, "avance", text);
+    await loadBundledAdvanceByUnitCsv(data, BUNDLED_UNIT_ADVANCE_CSV);
     await loadBundledDeliveredCsv(data, "calidad_final", BUNDLED_QUALITY_FINAL_CSV);
     data.source = "CSV local: AVANCE DE ENSAMBLE EH150_ABR.2026";
     data.updatedAt = new Date().toISOString();
@@ -397,6 +399,16 @@ async function loadBundledDeliveredCsv(data, processId, url) {
   const text = await response.text();
   const parsed = parseProcessCsv(text, process);
   data.deliveredChecks = { ...(data.deliveredChecks || {}), ...(parsed.delivered || {}) };
+}
+
+async function loadBundledAdvanceByUnitCsv(data, url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) return;
+  const text = await response.text();
+  const parsed = parseMcAvanceRows(nonEmptyCsvRows(text));
+  if (!parsed.equipos.length) return;
+  data.equipos = mergeEquipoRows(data.equipos, parsed.equipos);
+  data.progress = parsed.progress;
 }
 
 function render() {
@@ -1209,10 +1221,8 @@ function applyCsvToDataset(data, kind, text) {
     }
     const mcAvance = parseMcAvanceRows(nonEmptyCsvRows(text));
     if (mcAvance.equipos.length) {
-      data.equipos = mcAvance.equipos;
+      data.equipos = mergeEquipoRows(data.equipos, mcAvance.equipos);
       data.progress = mcAvance.progress;
-      data.activities = {};
-      data.activityDefinitions = {};
       data.activityStates = {};
       return;
     }
@@ -1398,6 +1408,10 @@ function parseMcGeneralRows(rows) {
 
     processColumns[currentProcessId] = processColumns[currentProcessId] || [];
     processColumns[currentProcessId].push({ col, label });
+  }
+
+  if (!Object.keys(processColumns).length) {
+    return { equipos: [], progress, activities, activityDefinitions, delivered };
   }
 
   Object.entries(processColumns).forEach(([processId, columns]) => {
@@ -1691,6 +1705,23 @@ function normalizeDataset(data) {
   linkFinanceRows(data);
 
   return data;
+}
+
+function mergeEquipoRows(baseRows = [], updateRows = []) {
+  if (!baseRows.length) return updateRows;
+  if (!updateRows.length) return baseRows;
+
+  const updatesById = new Map(updateRows.map((equipo) => [matchKey(equipo.id || equipo.control), equipo]));
+  const merged = baseRows.map((equipo) => {
+    const update = updatesById.get(matchKey(equipo.id || equipo.control));
+    return update ? { ...equipo, ...update, id: equipo.id || update.id, control: equipo.control || update.control } : equipo;
+  });
+  const seen = new Set(merged.map((equipo) => matchKey(equipo.id || equipo.control)));
+  updateRows.forEach((equipo) => {
+    const key = matchKey(equipo.id || equipo.control);
+    if (!seen.has(key)) merged.push(equipo);
+  });
+  return merged;
 }
 
 function syncEquiposFromFinance(data) {
