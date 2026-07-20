@@ -1,14 +1,15 @@
 const PROCESS_DEFS = [
-  { id: "estructurales", name: "Estructurales", sheet: "ESTRUCTURALES", activities: 25, color: "#1f78b8" },
-  { id: "brazos", name: "Brazos y sistema de nivelacion", sheet: "ENSAMBLE BRZ. SIS. DE NIVELACIO", activities: 75, color: "#3998d3" },
-  { id: "hidraulico", name: "Ensamble hidraulico inferior", sheet: "ENSAMBLE HIDRAULICO INFERIOR", activities: 38, color: "#155f95" },
-  { id: "pedestal", name: "Pedestal / tornamesa", sheet: "PEDESTAL-TORNAMESA", activities: 28, color: "#77bde5" },
-  { id: "talleres", name: "Talleres / mangueras", sheet: "TALLERES", activities: 148, color: "#6f7f8c" },
-  { id: "electrico", name: "Ensamble electrico", sheet: "ENSAMBLE ELECTRICO", activities: 65, color: "#0d3f66" },
+  { id: "estructurales", name: "Estructural", sheet: "ESTRUCTURALES", activities: 25, color: "#1f78b8" },
+  { id: "talleres", name: "Talleres", sheet: "TALLERES", activities: 148, color: "#6f7f8c" },
+  { id: "electrico", name: "Electricos", sheet: "ENSAMBLE ELECTRICO", activities: 65, color: "#0d3f66" },
+  { id: "hidraulico", name: "Ensamble inferior", sheet: "ENSAMBLE HIDRAULICO INFERIOR", activities: 38, color: "#155f95" },
+  { id: "pedestal", name: "Pedest/Tornam.", sheet: "PEDESTAL-TORNAMESA", activities: 28, color: "#77bde5" },
+  { id: "brazos", name: "Brz. sis. nivel", sheet: "ENSAMBLE BRZ. SIS. DE NIVELACIO", activities: 75, color: "#3998d3" },
   { id: "pruebas_iniciales", name: "Pruebas iniciales", sheet: "PRUEBAS INICIALES", activities: 32, color: "#4aaee8" },
-  { id: "acabados", name: "Acabados", sheet: "ACABADOS", activities: 63, color: "#9bb0bf" },
-  { id: "calidad_final", name: "Pruebas calidad finales", sheet: "PRUEBAS CALIDADFINALES", activities: 105, color: "#003f73" },
-  { id: "clavel", name: "Ensamble Clavel", sheet: "ENSAMBLE CLAVEL", activities: 92, color: "#2b2f33" },
+  { id: "acabado_inicial", name: "Acabado inicial", sheet: "ACABADO INICIAL", activities: 35, color: "#9bb0bf" },
+  { id: "pintura_detalles", name: "Pintura detalles", sheet: "PINTURA DETALLES", activities: 12, color: "#f08a24" },
+  { id: "acabado_final", name: "Acabado final", sheet: "ACABADO FINAL", activities: 16, color: "#2aa96b" },
+  { id: "calidad_final", name: "Pruebas calidad/finales", sheet: "PRUEBAS CALIDADFINALES", activities: 105, color: "#003f73" },
 ];
 
 const VIEWS = [
@@ -30,10 +31,10 @@ const STATUS = {
 };
 
 const SOURCE_FIELDS = [
-  { key: "equipos", label: "LISTA EQUIPOS / lista de chasis" },
-  { key: "avance", label: "% POR UNIDAD / AVANCE GENERAL" },
-  { key: "materiales", label: "Materiales" },
-  { key: "finanzas", label: "Finanzas / Copia de Hoja 1" },
+  { key: "equipos", label: "LISTA EQUIPOS / lista de chasis", sheets: ["LISTA EQUIPOS", "LISTA DE CHASIS", "lista de chasis"] },
+  { key: "avance", label: "% POR UNIDAD / AVANCE GENERAL", sheets: ["% POR UNIDAD", "AVANCE GENERAL", "% POR UNIDAD / AVANCE GENERAL"] },
+  { key: "materiales", label: "Materiales", sheets: ["MATERIALES", "Materiales"] },
+  { key: "finanzas", label: "Finanzas / Copia de Hoja 1", sheets: ["Copia de Hoja 1", "FINANZAS", "Finanzas"] },
 ];
 
 const FINANCE_DEFAULT_COLUMNS = [
@@ -50,8 +51,13 @@ const FINANCE_DEFAULT_COLUMNS = [
 ];
 
 const DEMO_SOURCE = "Datos demo";
+const BUNDLED_ADVANCE_CSV = "data/avance-general.csv";
+const BUNDLED_QUALITY_FINAL_CSV = "data/pruebas-calidad-finales.csv";
+const PUBLIC_SOURCES_URL = "data/sources.json";
+const DEFAULT_AUTO_REFRESH_MINUTES = 5;
 const STORAGE_KEY = "tablero-ensambles-config-v1";
 const app = document.getElementById("app");
+let autoRefreshTimer = null;
 
 let state = {
   view: "dashboard",
@@ -75,11 +81,13 @@ let state = {
   config: loadConfig(),
   data: getInitialData(),
   loading: false,
+  bundledLoaded: false,
   toast: "",
 };
 
 state.selectedId = state.data.equipos[0]?.id || null;
 render();
+bootstrapData();
 
 app.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
@@ -107,6 +115,7 @@ app.addEventListener("click", (event) => {
   if (action === "save-config") {
     state.config = readConfigFromDom();
     saveConfig(state.config);
+    startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
     state.toast = "Conexion guardada.";
     render();
   }
@@ -114,13 +123,53 @@ app.addEventListener("click", (event) => {
   if (action === "load-drive") {
     state.config = readConfigFromDom();
     saveConfig(state.config);
+    if (isFileProtocolWithGoogleSources(state.config)) {
+      state.toast = "Drive no carga si abres el tablero como Archivo. Abre http://127.0.0.1:8765/index.html o usa Importar CSV.";
+      render();
+      return;
+    }
     loadDriveData();
+    startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
+  }
+
+  if (action === "load-local-advance") {
+    state.data = createEmptyDataset();
+    state.selectedId = null;
+    state.financeVisibleColumns = [];
+    state.bundledLoaded = false;
+    loadBundledAdvanceData(true);
+  }
+
+  if (action === "load-finance-drive") {
+    state.config = readConfigFromDom();
+    saveConfig(state.config);
+    loadFinanceDrive();
+  }
+
+  if (action === "apply-bulk-sources") {
+    state.config = readConfigFromDom();
+    applyBulkSourcesToConfig(state.config, document.querySelector("[data-bulk-sources]")?.value || "");
+    saveConfig(state.config);
+    state.toast = "Enlaces aplicados. Revisa los campos y presiona Guardar y cargar.";
+    render();
   }
 
   if (action === "clear-config") {
     state.config = createEmptyConfig();
     saveConfig(state.config);
     state.toast = "Campos de conexion limpiados.";
+    render();
+  }
+
+  if (action === "clear-platform-data") {
+    state.config = createEmptyConfig();
+    saveConfig(state.config);
+    localStorage.removeItem(STORAGE_KEY);
+    state.data = createEmptyDataset();
+    state.selectedId = null;
+    state.financeVisibleColumns = [];
+    state.bundledLoaded = false;
+    state.toast = "Datos locales del tablero borrados. Drive no se modifico.";
     render();
   }
 
@@ -173,28 +222,181 @@ app.addEventListener("change", (event) => {
     const file = target.files?.[0];
     const kind = document.querySelector("[data-import-kind]")?.value || "equipos";
     if (file) importCsvFile(file, kind);
+    target.value = "";
   }
 });
 
-async function loadDriveData() {
-  state.loading = true;
-  state.toast = "Cargando datos desde Drive...";
-  render();
+async function bootstrapData() {
+  const publicConfig = await loadPublicSourceConfig();
+  if (publicConfig) {
+    state.config = mergeSourceConfigs(publicConfig, state.config);
+  }
+
+  if (hasConfiguredSources(state.config)) {
+    await loadDriveData({ keepView: true });
+    startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
+    return;
+  }
+
+  await loadBundledAdvanceData();
+}
+
+async function loadDriveData(options = {}) {
+  const { background = false, keepView = false } = options;
+  const previousView = state.view;
+  const previousSelectedId = state.selectedId;
+  state.loading = !background;
+  if (!background) {
+    state.toast = "Cargando datos desde Drive...";
+    render();
+  }
 
   try {
     const imported = await buildDatasetFromConfig(state.config);
     state.data = imported;
-    state.selectedId = imported.equipos[0]?.id || null;
-    state.view = "dashboard";
+    state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
+      ? previousSelectedId
+      : imported.equipos[0]?.id || null;
+    state.view = keepView ? previousView : "dashboard";
     state.toast = imported.loadErrors?.length
       ? `Datos actualizados con avisos: ${imported.loadErrors.join(" / ")}`
-      : `Datos actualizados: ${imported.equipos.length} equipos.`;
+      : `${background ? "Actualizacion automatica" : "Datos actualizados"}: ${imported.equipos.length} equipos.`;
   } catch (error) {
     state.toast = `No se pudieron cargar los CSV: ${error.message}`;
   } finally {
     state.loading = false;
     render();
   }
+}
+
+async function loadPublicSourceConfig() {
+  try {
+    const response = await fetch(PUBLIC_SOURCES_URL, { cache: "no-store" });
+    if (!response.ok) return null;
+    const config = await response.json();
+    return normalizeSourceConfig(config);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeSourceConfig(config) {
+  const clean = createEmptyConfig();
+  if (!config || typeof config !== "object") return clean;
+  clean.workbook = String(config.workbook || "").trim();
+  clean.equipos = String(config.equipos || "").trim();
+  clean.avance = String(config.avance || "").trim();
+  clean.materiales = String(config.materiales || "").trim();
+  clean.finanzas = String(config.finanzas || "").trim();
+  clean.autoRefreshMinutes = Number(config.autoRefreshMinutes) || DEFAULT_AUTO_REFRESH_MINUTES;
+  clean.processSheets = { ...clean.processSheets, ...(config.processSheets || {}) };
+  Object.keys(clean.processSheets).forEach((key) => {
+    clean.processSheets[key] = String(clean.processSheets[key] || "").trim();
+  });
+  return clean;
+}
+
+function mergeSourceConfigs(...configs) {
+  const merged = createEmptyConfig();
+  configs.forEach((config) => {
+    if (!config) return;
+    ["workbook", "equipos", "avance", "materiales", "finanzas"].forEach((key) => {
+      if (isUsableSourceUrl(config[key])) merged[key] = config[key];
+    });
+    if (Number(config.autoRefreshMinutes)) merged.autoRefreshMinutes = Number(config.autoRefreshMinutes);
+    Object.entries(config.processSheets || {}).forEach(([key, value]) => {
+      if (isUsableSourceUrl(value)) merged.processSheets[key] = value;
+    });
+  });
+  return merged;
+}
+
+function hasConfiguredSources(config) {
+  return [
+    config.workbook,
+    config.equipos,
+    config.avance,
+    config.materiales,
+    config.finanzas,
+    ...Object.values(config.processSheets || {}),
+  ].some(isUsableSourceUrl);
+}
+
+function startAutoRefresh(minutes = DEFAULT_AUTO_REFRESH_MINUTES) {
+  const safeMinutes = Math.max(1, Number(minutes) || DEFAULT_AUTO_REFRESH_MINUTES);
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => {
+    if (!state.loading && hasConfiguredSources(state.config)) {
+      loadDriveData({ background: true, keepView: true });
+    }
+  }, safeMinutes * 60 * 1000);
+}
+
+async function loadFinanceDrive() {
+  const url = state.config.finanzas;
+  if (!isUsableSourceUrl(url)) {
+    state.toast = "Pega el enlace CSV de Finanzas antes de cargar.";
+    render();
+    return;
+  }
+
+  state.loading = true;
+  state.toast = "Cargando Finanzas desde Drive...";
+  render();
+
+  try {
+    const text = await fetchCsv(url);
+    const data = createEmptyDataset();
+    applyCsvToDataset(data, "finanzas", text);
+    data.source = "Drive / Finanzas";
+    data.updatedAt = new Date().toISOString();
+    state.data = normalizeDataset(data);
+    state.selectedId = state.data.equipos[0]?.id || null;
+    state.view = "finanzas";
+    state.toast = `Finanzas cargado: ${state.data.finanzas.length} registros.`;
+  } catch (error) {
+    state.toast = `No se pudo cargar Finanzas: ${error.message}`;
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+async function loadBundledAdvanceData(force = false) {
+  if (!force && (state.bundledLoaded || state.loading || state.data.equipos.length || state.data.finanzas.length || state.data.materiales.length)) return;
+  state.bundledLoaded = true;
+
+  try {
+    const response = await fetch(BUNDLED_ADVANCE_CSV, { cache: "no-store" });
+    if (!response.ok) return;
+    const text = await response.text();
+    const data = createEmptyDataset();
+    applyCsvToDataset(data, "equipos", text);
+    applyCsvToDataset(data, "avance", text);
+    await loadBundledDeliveredCsv(data, "calidad_final", BUNDLED_QUALITY_FINAL_CSV);
+    data.source = "CSV local: AVANCE DE ENSAMBLE EH150_ABR.2026";
+    data.updatedAt = new Date().toISOString();
+    state.data = normalizeDataset(data);
+    state.selectedId = state.data.equipos[0]?.id || null;
+    state.toast = `Avance local cargado: ${state.data.equipos.length} unidades.`;
+    render();
+  } catch (error) {
+    if (force) {
+      state.toast = "No pude leer el CSV local guardado. Si estas en Archivo, usa Importar CSV o abre http://127.0.0.1:8765/index.html.";
+      render();
+    }
+  }
+}
+
+async function loadBundledDeliveredCsv(data, processId, url) {
+  const process = PROCESS_DEFS.find((item) => item.id === processId);
+  if (!process) return;
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) return;
+  const text = await response.text();
+  const parsed = parseProcessCsv(text, process);
+  data.deliveredChecks = { ...(data.deliveredChecks || {}), ...(parsed.delivered || {}) };
 }
 
 function render() {
@@ -292,7 +494,6 @@ function renderCurrentView() {
 
 function renderDashboardView() {
   const summary = getSummary(state.data);
-  const financeSummary = getDashboardFinanceSummary(state.data.finanzas || []);
   const processStats = getProcessStats(state.data);
   const statusStats = getStatusStats(state.data);
   const alerts = getAlerts(state.data).slice(0, 6);
@@ -302,18 +503,12 @@ function renderDashboardView() {
       ${renderMetric("Unidades", summary.fixedTotal, "fijas del programa", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, `${formatPercent(summary.finishedRate)} del total`, "terminado")}
       ${renderMetric("En proceso", summary.started, "unidades iniciadas", "en-proceso")}
-      ${renderMetric("Por hacer", summary.notStarted, `${summary.fixedTotal} fijas - ${summary.started} iniciadas`, "pendiente")}
+      ${renderMetric("Por hacer", summary.notStarted, `${summary.fixedTotal} fijas - ${summary.finished} terminadas`, "pendiente")}
       ${renderMetric("Entregado", summary.delivered, "check activo en Drive", "terminado")}
       ${renderMetric("Detenidas", summary.stopped, `${summary.corrections} con correccion`, "detenido")}
     </div>
 
-    <div class="grid finance-dashboard-metrics" style="margin-top: 14px;">
-      ${renderMetric("Saldo pendiente", formatCompactMoney(financeSummary.balance), "finanzas general", financeSummary.balance > 0 ? "correccion" : "terminado")}
-      ${renderMetric("Total factura", formatCompactMoney(financeSummary.invoice), "monto facturado", "en-proceso")}
-      ${renderMetric("Monto pagado", formatCompactMoney(financeSummary.paid), "pagos registrados", "terminado")}
-    </div>
-
-    <div class="grid dashboard-grid" style="margin-top: 14px;">
+    <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
       <section class="panel">
         <div class="panel-header">
           <div>
@@ -346,20 +541,19 @@ function renderDashboardView() {
       </section>
     </div>
 
-    <div class="grid dashboard-grid" style="margin-top: 14px;">
-      <section class="panel">
+    <div class="grid process-dashboard-stack" style="margin-top: 14px;">
+      <section class="panel process-focus-panel">
         <div class="panel-header">
           <div>
             <p class="panel-label">Procesos</p>
             <h2 class="panel-title">Avance por area</h2>
           </div>
+          <span class="badge">${formatPercent(summary.global)} global</span>
         </div>
-        <div class="bar-list">
-          ${processStats.map((process) => renderBarRow(process.name, process.percent, process.color)).join("")}
-        </div>
+        ${renderProcessFocus(processStats)}
       </section>
 
-      <section class="panel">
+      <section class="panel alert-panel">
         <div class="panel-header">
           <div>
             <p class="panel-label">Alertas</p>
@@ -482,10 +676,10 @@ function renderDetalleView() {
         <div class="panel-header">
           <div>
             <p class="panel-label">Cobertura</p>
-            <h2 class="panel-title">Mapa por proceso</h2>
+            <h2 class="panel-title">Grafica por proceso</h2>
           </div>
         </div>
-        ${renderRadar(processStats)}
+        ${renderDetailProcessChart(processStats)}
       </section>
     </div>
 
@@ -622,12 +816,19 @@ function renderFinanzasView() {
   const visibleColumns = getVisibleFinanceColumns(columns);
   const rows = getFilteredFinanceRows();
   const financeCharts = getFinanceChartData(rows);
+  const financeSummary = getDashboardFinanceSummary(rows);
   const moneyTotals = getFinanceMoneyTotals(rows, visibleColumns);
   const zones = getUniqueValues(state.data.finanzas || [], "zona");
   const paymentOptions = getUniqueFinanceFieldValues("fforma_de_pago");
   const paidOptions = getUniqueFinanceFieldValues("pagada_no_pagada");
 
   return `
+    <div class="grid finance-dashboard-metrics">
+      ${renderMetric("Saldo pendiente", formatCompactMoney(financeSummary.balance), "filtrado actual", financeSummary.balance > 0 ? "correccion" : "terminado")}
+      ${renderMetric("Total factura", formatCompactMoney(financeSummary.invoice), "filtrado actual", "en-proceso")}
+      ${renderMetric("Monto pagado", formatCompactMoney(financeSummary.paid), "filtrado actual", "terminado")}
+    </div>
+
     <section class="panel finance-panel">
       <div class="panel-header">
         <div>
@@ -721,6 +922,17 @@ function renderConfigView() {
             <h2 class="panel-title">Hojas principales</h2>
           </div>
         </div>
+        <div class="quick-source-box">
+          <label class="field">
+            <span class="field-label">Archivo completo AVANCE DE ENSAMBLE</span>
+            <input class="input" data-workbook-source value="${escapeAttr(state.config.workbook || "")}" placeholder="Pega aqui un solo enlace publicado del Google Sheet completo" />
+          </label>
+          <label class="field">
+            <span class="field-label">Carga rapida</span>
+            <textarea class="textarea" data-bulk-sources placeholder="Opcional: pega varios enlaces solo si necesitas ajustar hojas con nombre distinto."></textarea>
+          </label>
+          <button class="ghost-button" data-action="apply-bulk-sources">Aplicar enlaces</button>
+        </div>
         <div class="source-fields">
           ${SOURCE_FIELDS.map((field) => `
             <label class="field">
@@ -730,8 +942,10 @@ function renderConfigView() {
           `).join("")}
           <div class="toolbar" style="justify-content:flex-start;">
             <button class="solid-button" data-action="load-drive">Guardar y cargar</button>
+            <button class="ghost-button" data-action="load-finance-drive">Cargar solo Finanzas</button>
             <button class="ghost-button" data-action="save-config">Guardar</button>
             <button class="ghost-button" data-action="clear-config">Limpiar</button>
+            <button class="ghost-button danger-button" data-action="clear-platform-data">Borrar datos del tablero</button>
             <button class="ghost-button" data-action="reset-demo">Demo</button>
           </div>
         </div>
@@ -777,6 +991,10 @@ function renderConfigView() {
           <span class="field-label">CSV</span>
           <input class="input" type="file" accept=".csv,.txt" data-file-import />
         </label>
+        <div class="field file-actions">
+          <span class="field-label">Avance guardado</span>
+          <button class="solid-button" data-action="load-local-advance">Cargar AVANCE local</button>
+        </div>
       </div>
     </section>
   `;
@@ -827,17 +1045,25 @@ function createDemoData() {
   return normalizeDataset(data);
 }
 
+function createEmptyDataset() {
+  return normalizeDataset({
+    source: "Sin datos cargados",
+    equipos: [],
+    progress: {},
+    materiales: [],
+    finanzas: [],
+    financeColumns: [],
+    activities: {},
+    activityDefinitions: {},
+    activityStates: {},
+    deliveredChecks: {},
+    updatedAt: new Date().toISOString(),
+    meta: { equipos: 170 },
+  });
+}
+
 function getInitialData() {
-  let data;
-  if (window.EH150_EXCEL_DATA) {
-    data = JSON.parse(JSON.stringify(window.EH150_EXCEL_DATA));
-  } else {
-    data = createDemoData();
-  }
-  if (window.EH150_FINANCE_DATA) {
-    applyFinanceData(data, JSON.parse(JSON.stringify(window.EH150_FINANCE_DATA)));
-  }
-  return normalizeDataset(data);
+  return createEmptyDataset();
 }
 
 function createDemoMaterials() {
@@ -878,6 +1104,27 @@ function createDemoMaterials() {
 
 async function buildDatasetFromConfig(config) {
   const urls = [];
+  if (isUsableSourceUrl(config.workbook)) {
+    SOURCE_FIELDS.forEach((field) => {
+      (field.sheets || [field.label]).forEach((sheet) => {
+        urls.push({
+          kind: field.key,
+          label: `${field.label} (${sheet})`,
+          url: sheetCsvUrl(config.workbook, sheet),
+          optional: true,
+        });
+      });
+    });
+    PROCESS_DEFS.forEach((process) => {
+      urls.push({
+        kind: `process:${process.id}`,
+        label: `${process.name} (${process.sheet})`,
+        url: sheetCsvUrl(config.workbook, process.sheet),
+        process,
+        optional: true,
+      });
+    });
+  }
   SOURCE_FIELDS.forEach((field) => {
     if (isUsableSourceUrl(config[field.key])) urls.push({ kind: field.key, label: field.label, url: config[field.key] });
   });
@@ -886,7 +1133,7 @@ async function buildDatasetFromConfig(config) {
     if (isUsableSourceUrl(url)) urls.push({ kind: `process:${process.id}`, label: process.name, url, process });
   });
 
-  const data = JSON.parse(JSON.stringify(state.data?.equipos?.length ? state.data : createDemoData()));
+  const data = createEmptyDataset();
   if (!urls.length) return normalizeDataset(data);
 
   data.source = "Drive / CSV";
@@ -894,22 +1141,21 @@ async function buildDatasetFromConfig(config) {
 
   const loadErrors = [];
   let loadedCount = 0;
+  const loadedKinds = new Set();
   for (const item of urls) {
+    if (item.optional && loadedKinds.has(item.kind)) continue;
     try {
       const text = await fetchCsv(item.url);
       applyCsvToDataset(data, item.kind, text);
       loadedCount += 1;
+      loadedKinds.add(item.kind);
     } catch (error) {
-      loadErrors.push(`${item.label}: ${error.message}`);
+      if (!item.optional) loadErrors.push(`${item.label}: ${error.message}`);
     }
   }
 
   if (!loadedCount && loadErrors.length) throw new Error(loadErrors.join(" / "));
-
-  if (!data.equipos.length) {
-    const demo = createDemoData();
-    data.equipos = demo.equipos;
-  }
+  if (!loadedCount && urls.length) throw new Error("No pude leer ninguna hoja del archivo completo. Revisa que el Google Sheet este publicado en la web y que el enlace abra en el navegador.");
 
   const normalized = normalizeDataset(data);
   normalized.loadErrors = loadErrors;
@@ -923,6 +1169,9 @@ async function fetchCsv(inputUrl) {
     if (!response.ok) throw new Error(`HTTP ${response.status} en ${url}`);
     return await response.text();
   } catch (error) {
+    if (isPublishedGoogleSheetsUrl(inputUrl)) {
+      throw new Error("No pude leer el CSV publicado. Revisa que el enlace abra en otra pestana y termine en output=csv.");
+    }
     if (isGoogleSheetsUrl(inputUrl)) return fetchGoogleSheetCsvViaJsonp(inputUrl);
     throw error;
   }
@@ -948,6 +1197,25 @@ function applyCsvToDataset(data, kind, text) {
   }
 
   if (kind === "avance") {
+    const mcGeneral = parseMcGeneralRows(nonEmptyCsvRows(text));
+    if (mcGeneral.equipos.length) {
+      data.equipos = mcGeneral.equipos;
+      data.progress = mcGeneral.progress;
+      data.activities = mcGeneral.activities;
+      data.activityDefinitions = mcGeneral.activityDefinitions;
+      data.activityStates = {};
+      data.deliveredChecks = mcGeneral.delivered || {};
+      return;
+    }
+    const mcAvance = parseMcAvanceRows(nonEmptyCsvRows(text));
+    if (mcAvance.equipos.length) {
+      data.equipos = mcAvance.equipos;
+      data.progress = mcAvance.progress;
+      data.activities = {};
+      data.activityDefinitions = {};
+      data.activityStates = {};
+      return;
+    }
     const parsed = parseProgressSummaryCsv(text);
     mergeProgress(data.progress, parsed);
     return;
@@ -959,6 +1227,7 @@ function applyCsvToDataset(data, kind, text) {
     const parsed = parseProcessCsv(text, process);
     mergeProgress(data.progress, parsed.progress);
     data.activities = { ...data.activities, ...parsed.activities };
+    data.deliveredChecks = { ...(data.deliveredChecks || {}), ...(parsed.delivered || {}) };
   }
 }
 
@@ -981,6 +1250,10 @@ function importCsvFile(file, kind) {
 
 function parseEquiposCsv(text) {
   const rows = nonEmptyCsvRows(text);
+  const mcGeneral = parseMcGeneralRows(rows);
+  if (mcGeneral.equipos.length) return mcGeneral.equipos;
+  const mcAvance = parseMcAvanceRows(rows);
+  if (mcAvance.equipos.length) return mcAvance.equipos;
   if (looksLikeListaChasis(rows)) return parseListaChasisRows(rows);
 
   return csvToRecords(text).map((row, index) => {
@@ -999,6 +1272,7 @@ function parseEquiposCsv(text) {
       entrega: readField(row, ["entrega", "lote", "cantidad_estatus", "estatus_entrega"]),
       entregado: readField(row, ["entregado", "entregada", "check", "check_entregado", "unidad_entregada", "equipo_entregado"]),
       rawStatus: readField(row, ["estatus", "estatus_general", "estado", "cantidad"]),
+      blocked: isStoppedCheckValue(readField(row, ["detenido", "detenida", "bloqueado", "bloqueada", "paro", "hold"])),
       updatedAt: new Date().toISOString(),
     };
   }).filter((equipo) => equipo.control && equipo.control !== "EQ-1");
@@ -1059,6 +1333,12 @@ function parseFinanceCsv(text) {
 }
 
 function parseProgressSummaryCsv(text) {
+  const mcGeneral = parseMcGeneralRows(nonEmptyCsvRows(text));
+  if (Object.keys(mcGeneral.progress).length) return mcGeneral.progress;
+
+  const mcAvance = parseMcAvanceRows(nonEmptyCsvRows(text));
+  if (Object.keys(mcAvance.progress).length) return mcAvance.progress;
+
   const records = csvToRecords(text);
   const progress = {};
 
@@ -1085,6 +1365,235 @@ function parseProgressSummaryCsv(text) {
   return progress;
 }
 
+function parseMcGeneralRows(rows) {
+  const progress = {};
+  const activities = {};
+  const activityDefinitions = {};
+  const delivered = {};
+  const dataStart = rows.findIndex((row) => findEquipmentColumn(row) >= 0);
+  if (dataStart < 0) return { equipos: [], progress, activities, activityDefinitions, delivered };
+
+  const headerIndex = findMcGeneralHeaderIndex(rows, dataStart);
+  if (headerIndex < 0) return { equipos: [], progress, activities, activityDefinitions, delivered };
+
+  const headerRow = rows[headerIndex] || [];
+  const groupRow = rows[Math.max(0, headerIndex - 1)] || [];
+  const statusColumn = findMcStatusColumn(rows, dataStart);
+  const deliveredColumn = findDeliveredColumn(headerRow, groupRow);
+  const dataRows = rows.slice(dataStart).filter((row) => findEquipmentColumn(row) >= 0);
+  const maxColumns = Math.max(headerRow.length, groupRow.length, ...dataRows.map((row) => row.length));
+  const processColumns = {};
+  let currentProcessId = "";
+
+  for (let col = 6; col < maxColumns; col += 1) {
+    const groupLabel = String(groupRow[col] || "").trim();
+    const mapped = groupLabel ? mcGeneralGroupProcess(groupLabel) : "";
+    if (mapped) currentProcessId = mapped;
+    if (!currentProcessId) continue;
+
+    const label = String(headerRow[col] || "").trim();
+    if (!isActivityHeaderLabel(label)) continue;
+    const hasActivityValue = dataRows.some((row) => isMcGeneralActivityValue(row[col]));
+    if (!hasActivityValue) continue;
+
+    processColumns[currentProcessId] = processColumns[currentProcessId] || [];
+    processColumns[currentProcessId].push({ col, label });
+  }
+
+  Object.entries(processColumns).forEach(([processId, columns]) => {
+    activityDefinitions[processId] = columns.map(({ label }, index) => ({
+      id: `${processId}-${index + 1}`,
+      name: label,
+      subprocess: PROCESS_DEFS.find((process) => process.id === processId)?.name || processId,
+    }));
+  });
+
+  const equipos = dataRows.map((row, index) => {
+    const control = String(row[1] || "").trim();
+    const vin = String(row[2] || "").trim();
+    const id = control || `EQ-${index + 1}`;
+    const statusValue = statusColumn.index >= 0 ? String(row[statusColumn.index] || "").trim() : "";
+    const rawStatus = statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue) ? "detenido" : statusValue;
+    if (deliveredColumn >= 0) delivered[id] = isDeliveredCheckValue(row[deliveredColumn]);
+
+    progress[id] = progress[id] || {};
+
+    PROCESS_DEFS.forEach((process) => {
+      const columns = processColumns[process.id] || [];
+      let done = 0;
+      let corrections = 0;
+      const rowActivities = columns.map(({ col, label }, activityIndex) => {
+        const stateName = activityState(row[col]);
+        if (stateName === "hecho") done += 1;
+        if (stateName === "correccion") corrections += 1;
+        return {
+          id: `${process.id}-${activityIndex + 1}`,
+          name: label,
+          subprocess: process.name,
+          state: stateName,
+          minutes: 15 + (activityIndex % 7) * 5,
+        };
+      });
+
+      progress[id][process.id] = {
+        done,
+        total: columns.length || process.activities,
+        corrections,
+        updatedAt: new Date().toISOString(),
+      };
+      activities[`${id}:${process.id}`] = rowActivities;
+    });
+
+    return {
+      id,
+      control: id,
+      vin,
+      serie_grua: "",
+      division: String(row[5] || "").trim(),
+      consecutivo: String(row[4] || row[0] || index + 1).trim(),
+      modelo: "",
+      plazo: "",
+      entrega: "",
+      entregado: "",
+      rawStatus,
+      blocked: statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue),
+      updatedAt: new Date().toISOString(),
+    };
+  }).filter((equipo) => equipo.control || equipo.vin);
+
+  return { equipos, progress, activities, activityDefinitions, delivered };
+}
+
+function findMcGeneralHeaderIndex(rows, dataStart) {
+  for (let index = 0; index < dataStart; index += 1) {
+    const keys = rows[index].map(normalizeKey);
+    const hasAlmacen = keys.some((key) => key.includes("almacen"));
+    const hasVin = keys.includes("vin");
+    if (hasAlmacen && hasVin) return index;
+  }
+
+  let best = { index: -1, score: -1 };
+  rows.slice(0, dataStart).forEach((row, index) => {
+    const keys = row.map(normalizeKey);
+    const score =
+      (keys.some((key) => key.includes("almacen")) ? 5 : 0) +
+      (keys.includes("vin") ? 5 : 0) +
+      keys.reduce((sum, key) => sum + (isActivityHeaderLabel(key) ? 1 : 0), 0);
+    if (score > best.score) best = { index, score };
+  });
+  return best.score >= 12 ? best.index : -1;
+}
+
+function mcGeneralGroupProcess(value) {
+  const key = normalizeKey(value);
+  if (!key) return "";
+  if (key.includes("estructural")) return "estructurales";
+  if (key.includes("electrico")) return "electrico";
+  if (key.includes("hidraulico") || key.includes("inferior")) return "hidraulico";
+  if (key.includes("pedestal") || key.includes("tornamesa")) return "pedestal";
+  if (key.includes("brazo") || key.includes("nivelacion")) return "brazos";
+  if (key.includes("acabados_procesos") || key.includes("acabado_inicial")) return "acabado_inicial";
+  if (key.includes("pintura")) return "pintura_detalles";
+  if (key.includes("acabado_final")) return "acabado_final";
+  if (key.includes("taller")) return "talleres";
+  if (key.includes("pruebas_iniciales")) return "pruebas_iniciales";
+  if (key.includes("pruebas_finales") || key.includes("calidad")) return "calidad_final";
+  return "";
+}
+
+function isMcGeneralActivityValue(value) {
+  const text = normalizeText(value).replace(",", ".");
+  if (!text || text === "#ref!") return false;
+  if (["0", "0.0", "1", "1.0", "c", "x", "ok", "si", "no"].includes(text)) return true;
+  const numeric = Number(text.replace("%", ""));
+  return !Number.isNaN(numeric) && numeric >= 0 && numeric <= 100;
+}
+
+function parseMcAvanceRows(rows) {
+  const dataStart = rows.findIndex((row) => row.some(isEquipmentCode));
+  if (dataStart < 0) return { equipos: [], progress: {} };
+  const statusColumn = findMcStatusColumn(rows, dataStart);
+
+  const processColumns = {
+    estructurales: [19],
+    talleres: [20],
+    electrico: [21],
+    hidraulico: [22],
+    pedestal: [23],
+    brazos: [24],
+    pruebas_iniciales: [25],
+    acabado_inicial: [26],
+    pintura_detalles: [27],
+    acabado_final: [28],
+    calidad_final: [29],
+  };
+
+  const equipos = [];
+  const progress = {};
+
+  rows.slice(dataStart).forEach((row, index) => {
+    const control = String(row[1] || "").trim();
+    const vin = String(row[2] || "").trim();
+    if (!isEquipmentCode(control) && !vin) return;
+
+    const id = control || `EQ-${index + 1}`;
+    const statusValue = statusColumn.index >= 0 ? String(row[statusColumn.index] || "").trim() : "";
+    const rawStatus = statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue) ? "detenido" : statusValue;
+    equipos.push({
+      id,
+      control: id,
+      vin,
+      serie_grua: "",
+      division: String(row[4] || "").trim(),
+      consecutivo: String(row[3] || row[0] || index + 1).trim(),
+      modelo: "",
+      plazo: "",
+      entrega: "",
+      entregado: "",
+      rawStatus,
+      blocked: statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue),
+      updatedAt: new Date().toISOString(),
+    });
+
+    progress[id] = progress[id] || {};
+    PROCESS_DEFS.forEach((process) => {
+      const columns = processColumns[process.id] || [];
+      const values = columns
+        .map((column) => parseProgressValue(row[column]))
+        .filter((value) => !Number.isNaN(value));
+      const percent = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+      progress[id][process.id] = {
+        done: Math.round((process.activities * clamp(percent, 0, 100)) / 100),
+        total: process.activities,
+        corrections: 0,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  });
+
+  return { equipos, progress };
+}
+
+function findMcStatusColumn(rows, dataStart) {
+  const headerRows = rows.slice(Math.max(0, dataStart - 8), dataStart);
+  let genericStatus = -1;
+
+  for (const row of headerRows) {
+    for (let index = 0; index < row.length; index += 1) {
+      const key = normalizeKey(row[index]);
+      if (!key) continue;
+      if (key.includes("deten") || key.includes("bloq") || key.includes("paro") || key.includes("hold")) {
+        return { index, kind: "detenido" };
+      }
+      if (genericStatus < 0 && (key.includes("estatus") || key.includes("estado") || key.includes("status"))) {
+        genericStatus = index;
+      }
+    }
+  }
+
+  return { index: genericStatus, kind: genericStatus >= 0 ? "estatus" : "" };
+}
+
 function parseProcessCsv(text, process) {
   const mcProcess = parseMcProcessRows(nonEmptyCsvRows(text), process);
   if (Object.keys(mcProcess.progress).length) return mcProcess;
@@ -1092,11 +1601,14 @@ function parseProcessCsv(text, process) {
   const records = csvToRecords(text);
   const progress = {};
   const activities = {};
+  const delivered = {};
 
   records.forEach((row, rowIndex) => {
     const equipoId =
       readField(row, ["id_equipo", "equipo", "numero", "control", "numero_control", "no_control", "almacen"]) ||
       `EQ-${rowIndex + 1}`;
+    const deliveredValue = readField(row, ["entregado", "entregada", "check_entregado", "unidad_entregada", "equipo_entregado"]);
+    if (deliveredValue !== "") delivered[equipoId] = isDeliveredCheckValue(deliveredValue);
     const activityKeys = Object.keys(row).filter((key) => !isMetaKey(key));
     let done = 0;
     let corrections = 0;
@@ -1127,7 +1639,7 @@ function parseProcessCsv(text, process) {
     activities[`${equipoId}:${process.id}`] = rowActivities;
   });
 
-  return { progress, activities };
+  return { progress, activities, delivered };
 }
 
 function applyFinanceData(data, financeData) {
@@ -1144,6 +1656,9 @@ function normalizeDataset(data) {
   data.activities = data.activities || {};
   data.activityDefinitions = data.activityDefinitions || {};
   data.activityStates = data.activityStates || {};
+  data.deliveredChecks = data.deliveredChecks || {};
+
+  syncEquiposFromFinance(data);
 
   data.equipos = (data.equipos || []).map((equipo, index) => {
     const id = equipo.id || `EQ-${index + 1}`;
@@ -1176,6 +1691,37 @@ function normalizeDataset(data) {
   linkFinanceRows(data);
 
   return data;
+}
+
+function syncEquiposFromFinance(data) {
+  if ((data.equipos || []).length || !(data.finanzas || []).length) return;
+
+  const seen = new Set();
+  data.equipos = data.finanzas.map((row, index) => {
+    const fields = row.fields || {};
+    const almacen = row.almacen || readFinanceField(fields, ["almacen", "numero_almacen", "n_almacen", "no_almacen"]);
+    const vin = row.vin || readFinanceField(fields, ["vin"]);
+    const zona = row.zona || readFinanceField(fields, ["division_zona", "division", "zona"]);
+    const baseId = almacen || vin || `FIN-${index + 1}`;
+    let id = String(baseId).trim() || `FIN-${index + 1}`;
+    if (seen.has(matchKey(id))) id = `${id}-${index + 1}`;
+    seen.add(matchKey(id));
+
+    return {
+      id,
+      control: almacen || id,
+      vin,
+      serie_grua: "",
+      division: zona,
+      consecutivo: String(index + 1).padStart(3, "0"),
+      modelo: "",
+      plazo: "",
+      entrega: "",
+      entregado: readFinanceField(fields, ["entregado", "entregada", "check", "unidad_entregada"]),
+      rawStatus: "",
+      updatedAt: data.updatedAt,
+    };
+  }).filter((equipo) => equipo.control || equipo.vin || equipo.division);
 }
 
 function linkFinanceRows(data) {
@@ -1235,7 +1781,7 @@ function getSummary(data) {
     stopped,
     delivered,
     started,
-    notStarted: Math.max(fixedTotal - started, 0),
+    notStarted: Math.max(fixedTotal - finished, 0),
     inProgress: equipos.filter((equipo) => equipo.status === "en_proceso").length,
     corrections: equipos.filter((equipo) => equipo.status === "correccion").length,
     materialShortage: (data.materiales || []).filter((item) => item.pendiente > 0).length,
@@ -1249,6 +1795,10 @@ function getSummary(data) {
 
 function getDeliveredCount(data) {
   const delivered = new Set();
+
+  Object.entries(data.deliveredChecks || {}).forEach(([id, value]) => {
+    if (isDeliveredCheckValue(value)) delivered.add(id);
+  });
 
   (data.finanzas || []).forEach((row) => {
     if (!hasDeliveredCheck(row.fields || row)) return;
@@ -1281,6 +1831,11 @@ function hasDeliveredCheck(fields) {
 function isDeliveredCheckValue(value) {
   const text = normalizeText(value);
   return ["1", "si", "sí", "x", "ok", "true", "hecho", "entregado", "entregada"].includes(text);
+}
+
+function isStoppedCheckValue(value) {
+  const text = normalizeText(value);
+  return ["1", "si", "sÃ­", "x", "ok", "true", "detenido", "detenida", "bloqueado", "bloqueada", "paro", "hold"].includes(text);
 }
 
 function getProcessStats(data) {
@@ -1636,6 +2191,175 @@ function renderRadar(processStats) {
   `;
 }
 
+function renderProcessFocus(processStats) {
+  const average = processStats.length
+    ? processStats.reduce((sum, process) => sum + Number(process.percent || 0), 0) / processStats.length
+    : 0;
+  const sorted = [...processStats].sort((a, b) => b.percent - a.percent);
+  const top = sorted[0];
+  const lagging = [...processStats].sort((a, b) => a.percent - b.percent)[0];
+
+  return `
+    <div class="process-focus">
+      <div class="process-summary-strip">
+        <div class="process-summary-card primary">
+          <span>Promedio areas</span>
+          <strong>${formatPercent(average)}</strong>
+          <small>avance general de los 11 ensambles</small>
+        </div>
+        <div class="process-summary-card">
+          <span>Mas avanzado</span>
+          <strong>${top ? formatPercent(top.percent) : "-"}</strong>
+          <small>${escapeHtml(top?.name || "-")}</small>
+        </div>
+        <div class="process-summary-card warning">
+          <span>Mayor rezago</span>
+          <strong>${lagging ? formatPercent(lagging.percent) : "-"}</strong>
+          <small>${escapeHtml(lagging?.name || "-")}</small>
+        </div>
+      </div>
+      <div class="bar-list process-bar-list">
+        ${processStats.map((process) => renderProcessBarRow(process)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderProcessBarRow(process) {
+  return `
+    <div class="bar-row process-bar-row">
+      <span class="bar-label" title="${escapeAttr(process.name)}">${escapeHtml(process.name)}</span>
+      <div class="bar-track"><div class="bar-fill" style="--value:${clamp(process.percent, 0, 100)}%; --bar-color:${process.color};"></div></div>
+      <span class="bar-value">${formatPercent(process.percent)}</span>
+      <span class="process-count-inline">${process.done} / ${process.total}</span>
+    </div>
+  `;
+}
+
+function renderProcessPiePanel(processStats, title) {
+  return `
+    <div class="process-pie-layout">
+      ${renderProcessPie(processStats)}
+      <div class="legend process-pie-legend">
+        ${processStats.map((process) => renderLegendRow(process.name, formatPercent(process.percent), process.color)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderProcessPie(processStats) {
+  const values = processStats.map((process) => Math.max(Number(process.percent) || 0, 0));
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (!total) {
+    return `
+      <svg class="process-pie" viewBox="0 0 200 200" role="img" aria-label="Sin avance por proceso">
+        <circle cx="100" cy="100" r="78" fill="#e9eff4"></circle>
+        <text class="ring-number" x="100" y="98" text-anchor="middle">0%</text>
+        <text class="ring-label" x="100" y="120" text-anchor="middle">AVANCE</text>
+      </svg>
+    `;
+  }
+
+  let startAngle = -90;
+  const segments = processStats.map((process, index) => {
+    const angle = (values[index] / total) * 360;
+    const segment = pieSegmentPath(100, 100, 82, startAngle, startAngle + angle);
+    startAngle += angle;
+    return `<path d="${segment}" fill="${process.color}"></path>`;
+  }).join("");
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  return `
+    <svg class="process-pie" viewBox="0 0 200 200" role="img" aria-label="Pastel de avance por proceso">
+      ${segments}
+      <circle cx="100" cy="100" r="42" fill="#ffffff"></circle>
+      <text class="ring-number" x="100" y="98" text-anchor="middle">${formatPercent(average)}</text>
+      <text class="ring-label" x="100" y="120" text-anchor="middle">PROMEDIO</text>
+    </svg>
+  `;
+}
+
+function pieSegmentPath(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, endAngle);
+  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+  return [
+    `M ${cx} ${cy}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArc} 0 ${end.x} ${end.y}`,
+    "Z",
+  ].join(" ");
+}
+
+function polarToCartesian(cx, cy, radius, angleDegrees) {
+  const angle = (angleDegrees - 90) * Math.PI / 180;
+  return {
+    x: cx + radius * Math.cos(angle),
+    y: cy + radius * Math.sin(angle),
+  };
+}
+
+function renderDetailProcessChart(processStats) {
+  const width = 760;
+  const height = 380;
+  const leftPad = 44;
+  const rightPad = 22;
+  const topPad = 42;
+  const bottomPad = 86;
+  const chartWidth = width - leftPad - rightPad;
+  const chartHeight = height - topPad - bottomPad;
+  const step = chartWidth / processStats.length;
+  const barWidth = Math.min(42, step * 0.68);
+  const maxValue = 100;
+  const yFor = (value) => topPad + chartHeight - (clamp(value, 0, maxValue) / maxValue) * chartHeight;
+  const metaValues = processStats.map(() => 100);
+  const linePoints = metaValues.map((value, index) => {
+    const x = leftPad + step * index + step / 2;
+    return `${x},${yFor(value)}`;
+  }).join(" ");
+  const bars = processStats.map((process, index) => {
+    const x = leftPad + step * index + (step - barWidth) / 2;
+    const y = yFor(process.percent);
+    const barHeight = topPad + chartHeight - y;
+    const label = process.name.length > 12 ? `${process.name.slice(0, 10)}.` : process.name;
+    return `
+      <g>
+        <rect class="detail-chart-bar" x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" rx="2"></rect>
+        <text class="detail-chart-value" x="${x + barWidth / 2}" y="${Math.max(y - 7, 18)}" text-anchor="middle">${formatPercent(process.percent)}</text>
+        <text class="detail-chart-axis-label" x="${x + barWidth / 2}" y="${height - 48}" text-anchor="end" transform="rotate(-35 ${x + barWidth / 2} ${height - 48})">${escapeHtml(label)}</text>
+      </g>
+    `;
+  }).join("");
+  const grid = [0, 25, 50, 75, 100].map((tick) => {
+    const y = yFor(tick);
+    return `
+      <g>
+        <line class="detail-chart-grid" x1="${leftPad}" y1="${y}" x2="${width - rightPad}" y2="${y}"></line>
+        <text class="detail-chart-tick" x="${leftPad - 10}" y="${y + 4}" text-anchor="end">${tick}</text>
+      </g>
+    `;
+  }).join("");
+
+  return `
+    <div class="detail-chart-wrap">
+      <svg class="detail-process-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafica de avance por proceso">
+        <text class="detail-chart-kpi" x="${leftPad}" y="22">${formatPercent(processStats.reduce((sum, process) => sum + process.percent, 0) / Math.max(processStats.length, 1))}</text>
+        <text class="detail-chart-subtitle" x="${leftPad + 72}" y="22">Avance promedio</text>
+        <g class="detail-chart-legend">
+          <circle cx="${width - 174}" cy="20" r="6"></circle>
+          <text x="${width - 160}" y="24">Avance</text>
+          <circle class="meta" cx="${width - 90}" cy="20" r="6"></circle>
+          <text x="${width - 76}" y="24">Meta</text>
+        </g>
+        ${grid}
+        ${bars}
+        <polyline class="detail-chart-line" points="${linePoints}"></polyline>
+        ${metaValues.map((value, index) => `<circle class="detail-chart-line-point" cx="${leftPad + step * index + step / 2}" cy="${yFor(value)}" r="3.5"></circle>`).join("")}
+      </svg>
+    </div>
+  `;
+}
+
 function renderBarRow(label, percent, color) {
   return `
     <div class="bar-row">
@@ -1840,7 +2564,7 @@ function emptyProgress(process) {
 
 function computedStatus(equipo, totals) {
   if (totals.percent >= 99.5) return "terminado";
-  if (equipo.blocked || (totals.percent < 60 && Number(equipo.consecutivo || 0) % 17 === 0)) return "detenido";
+  if (equipo.blocked) return "detenido";
   if (totals.corrections > 4) return "correccion";
   if (totals.percent <= 1) return "pendiente";
   return "en_proceso";
@@ -2164,16 +2888,18 @@ function parseMcMaterialesRows(rows) {
 function parseMcProcessRows(rows, process) {
   const progress = {};
   const activities = {};
-  if (!process || !rows.length) return { progress, activities };
+  const delivered = {};
+  if (!process || !rows.length) return { progress, activities, delivered };
 
   const firstDataIndex = rows.findIndex((row) => findEquipmentColumn(row) >= 0);
-  if (firstDataIndex < 0) return { progress, activities };
+  if (firstDataIndex < 0) return { progress, activities, delivered };
 
   const headerIndex = findActivityHeaderIndex(rows, firstDataIndex);
   const headerRow = rows[headerIndex] || [];
   const groupRow = rows[Math.max(0, headerIndex - 1)] || [];
   const dataRows = rows.slice(firstDataIndex).filter((row) => findEquipmentColumn(row) >= 0);
   const activityStart = findActivityStartColumn(headerRow, dataRows);
+  const deliveredColumn = findDeliveredColumn(headerRow, groupRow);
   const activityColumns = [];
   const maxColumns = Math.max(headerRow.length, groupRow.length, ...dataRows.map((row) => row.length));
 
@@ -2189,6 +2915,7 @@ function parseMcProcessRows(rows, process) {
     const equipoCol = findEquipmentColumn(row);
     const equipoId = row[equipoCol];
     if (!isEquipmentCode(equipoId)) return;
+    if (deliveredColumn >= 0) delivered[equipoId] = isDeliveredCheckValue(row[deliveredColumn]);
 
     let done = 0;
     let corrections = 0;
@@ -2215,7 +2942,26 @@ function parseMcProcessRows(rows, process) {
     activities[`${equipoId}:${process.id}`] = rowActivities;
   });
 
-  return { progress, activities };
+  return { progress, activities, delivered };
+}
+
+function findDeliveredColumn(...headerRows) {
+  const maxColumns = Math.max(...headerRows.map((row) => row.length), 0);
+  for (let col = 0; col < maxColumns; col += 1) {
+    const key = normalizeKey(headerRows.map((row) => row[col]).filter(Boolean).join(" "));
+    if (
+      key === "entregado" ||
+      key === "entregada" ||
+      key.includes("entregado") ||
+      key.includes("entregada") ||
+      key.includes("check_entreg") ||
+      key.includes("unidad_entreg") ||
+      key.includes("equipo_entreg")
+    ) {
+      return col;
+    }
+  }
+  return -1;
 }
 
 function findHeaderColumn(header, candidates) {
@@ -2254,15 +3000,20 @@ function findActivityStartColumn(headerRow, dataRows) {
 }
 
 function isActivityHeaderLabel(value) {
+  const raw = String(value || "").trim();
+  if (/^#?ref!?$/i.test(raw) || raw.includes("%")) return false;
+  if (/^\d+([.,:]\d+)*$/.test(raw)) return false;
   const text = normalizeText(value);
   if (!text || text.length < 3) return false;
   if (/^\d+([\.:]\d+)*$/.test(text) || text.includes("0:")) return false;
-  const blocked = [
-    "almacen", "avance", "cantidad", "chasis", "consecutivo", "control", "corregir", "division",
-    "entrega", "estatus", "fecha", "hecho", "marca", "modelo", "notas", "orden", "pendiente",
-    "rectificar", "serie", "sin hacer", "tiempo", "total", "unidad", "vin",
+  const exactBlocked = [
+    "almacen", "avance", "cantidad", "chasis", "consecutivo", "control", "division",
+    "entrega", "entregado", "entregada", "estatus", "estado", "fecha", "hecho", "marca", "modelo", "notas", "orden", "pendiente",
+    "serie", "sin hacer", "tiempo", "total", "unidad", "vin",
   ];
-  return !blocked.some((term) => text.includes(term));
+  const partialBlocked = ["corregir", "rectificar"];
+  if (exactBlocked.includes(text)) return false;
+  return !partialBlocked.some((term) => text.includes(term));
 }
 
 function isActivityCellValue(value) {
@@ -2275,9 +3026,15 @@ function isActivityCellValue(value) {
 
 function processHeaderCandidates(process) {
   const base = [process.id, process.name, process.sheet];
+  if (process.id === "estructurales") base.push("estructural");
   if (process.id === "hidraulico") base.push("hidraulico inferior", "hidraulica");
-  if (process.id === "electrico") base.push("electrico", "electricidad");
-  if (process.id === "calidad_final") base.push("calidad finales", "pruebas finales");
+  if (process.id === "electrico") base.push("electrico", "electricos", "electricidad");
+  if (process.id === "pedestal") base.push("pedest tornam", "pedestal tornamesa", "tornamesa");
+  if (process.id === "brazos") base.push("brz sis nivel", "brazos sistema nivelacion");
+  if (process.id === "acabado_inicial") base.push("acabado inicial");
+  if (process.id === "pintura_detalles") base.push("pintura detalles");
+  if (process.id === "acabado_final") base.push("acabado final");
+  if (process.id === "calidad_final") base.push("calidad finales", "pruebas finales", "pruebas calidad finales", "pruebas calidad/finales");
   if (process.id === "pruebas_iniciales") base.push("pruebas iniciales");
   return base;
 }
@@ -2286,7 +3043,7 @@ function isMetaKey(key) {
   const meta = [
     "id", "id_equipo", "equipo", "numero", "no", "num", "control", "numero_control", "no_control",
     "almacen", "vin", "division", "entrega", "estatus", "estado", "fecha", "observaciones",
-    "serie", "serie_grua", "consecutivo", "modelo", "plazo",
+    "serie", "serie_grua", "consecutivo", "modelo", "plazo", "entregado", "entregada",
   ];
   return meta.includes(key);
 }
@@ -2334,6 +3091,7 @@ function normalizeGoogleCsvUrl(inputUrl) {
   const url = String(inputUrl || "").trim();
   if (!url) return url;
   if (!url.includes("docs.google.com/spreadsheets")) return url;
+  if (url.includes("/gviz/tq")) return url;
   const gidMatch = url.match(/[?#&]gid=([0-9]+)/);
   const gid = gidMatch ? gidMatch[1] : "0";
 
@@ -2348,6 +3106,24 @@ function normalizeGoogleCsvUrl(inputUrl) {
   return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv&gid=${gid}`;
 }
 
+function sheetCsvUrl(inputUrl, sheetName) {
+  const url = String(inputUrl || "").trim();
+  const encodedSheet = encodeURIComponent(sheetName);
+  if (!url.includes("docs.google.com/spreadsheets")) return url;
+
+  const publishedMatch = url.match(/\/spreadsheets\/d\/e\/([^/]+)/);
+  if (publishedMatch) {
+    return `https://docs.google.com/spreadsheets/d/e/${publishedMatch[1]}/pub?single=true&output=csv&sheet=${encodedSheet}`;
+  }
+
+  const match = url.match(/\/spreadsheets\/d\/([^/]+)/);
+  if (match) {
+    return `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv&sheet=${encodedSheet}`;
+  }
+
+  return url;
+}
+
 function isUsableSourceUrl(inputUrl) {
   const url = String(inputUrl || "").trim();
   if (!url) return false;
@@ -2358,6 +3134,20 @@ function isUsableSourceUrl(inputUrl) {
 
 function isGoogleSheetsUrl(inputUrl) {
   return String(inputUrl || "").includes("docs.google.com/spreadsheets");
+}
+
+function isFileProtocolWithGoogleSources(config) {
+  if (window.location.protocol !== "file:") return false;
+  const urls = [
+    config.workbook,
+    ...SOURCE_FIELDS.map((field) => config[field.key]),
+    ...PROCESS_DEFS.map((process) => config.processSheets?.[process.id]),
+  ];
+  return urls.some((url) => isUsableSourceUrl(url) && isGoogleSheetsUrl(url));
+}
+
+function isPublishedGoogleSheetsUrl(inputUrl) {
+  return /docs\.google\.com\/spreadsheets\/d\/e\//.test(String(inputUrl || ""));
 }
 
 function googleSheetsGvizUrl(inputUrl) {
@@ -2458,6 +3248,8 @@ function uniqueId(id, index) {
 
 function createEmptyConfig() {
   return {
+    autoRefreshMinutes: DEFAULT_AUTO_REFRESH_MINUTES,
+    workbook: "",
     equipos: "",
     avance: "",
     materiales: "",
@@ -2484,6 +3276,8 @@ function saveConfig(config) {
 
 function readConfigFromDom() {
   const config = createEmptyConfig();
+  const workbookInput = document.querySelector("[data-workbook-source]");
+  config.workbook = workbookInput?.value.trim() || "";
   document.querySelectorAll("[data-source-key]").forEach((input) => {
     config[input.dataset.sourceKey] = input.value.trim();
   });
@@ -2491,6 +3285,57 @@ function readConfigFromDom() {
     config.processSheets[input.dataset.processSource] = input.value.trim();
   });
   return config;
+}
+
+function applyBulkSourcesToConfig(config, text) {
+  const entries = parseBulkSourceEntries(text);
+  entries.forEach((entry) => {
+    const target = detectSourceTarget(entry.label || entry.url);
+    if (!target) {
+      config.workbook = entry.url;
+      return;
+    }
+    if (target === "workbook") {
+      config.workbook = entry.url;
+      return;
+    }
+    if (target.startsWith("process:")) {
+      config.processSheets[target.split(":")[1]] = entry.url;
+    } else {
+      config[target] = entry.url;
+    }
+  });
+}
+
+function parseBulkSourceEntries(text) {
+  const entries = [];
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  lines.forEach((line) => {
+    const urls = line.match(/https?:\/\/\S+/g) || [];
+    if (!urls.length) return;
+    const label = line.slice(0, line.indexOf(urls[0])).replace(/[:=-]+$/g, "").trim();
+    urls.forEach((url) => entries.push({ label, url: url.replace(/[),.;]+$/g, "") }));
+  });
+  if (!entries.length) {
+    const urls = String(text || "").match(/https?:\/\/\S+/g) || [];
+    urls.forEach((url) => entries.push({ label: "", url: url.replace(/[),.;]+$/g, "") }));
+  }
+  return entries;
+}
+
+function detectSourceTarget(text) {
+  const key = normalizeKey(text);
+  if (!key) return "";
+  if (key.includes("avance_de_ensamble") || key.includes("archivo_completo") || key.includes("libro_completo")) return "workbook";
+  if (key.includes("finanza") || key.includes("copia_de_hoja_1") || key.includes("estatus")) return "finanzas";
+  if (key.includes("material")) return "materiales";
+  if (key.includes("avance_general") || key.includes("por_unidad") || key.includes("unidad")) return "avance";
+  if (key.includes("chasis") || key.includes("lista_equipo") || key.includes("equipo")) return "equipos";
+  const process = PROCESS_DEFS.find((item) => {
+    const processKeys = [item.id, item.name, item.sheet].map(normalizeKey);
+    return processKeys.some((processKey) => key.includes(processKey) || processKey.includes(key));
+  });
+  return process ? `process:${process.id}` : "";
 }
 
 function escapeHtml(value) {

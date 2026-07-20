@@ -19,6 +19,41 @@ Abre `index.html` en el navegador. No requiere instalacion ni servidor.
    - Hojas de proceso, si quieres calcular avance desde actividades.
 5. Pulsa `Guardar y cargar`.
 
+## Publicar con actualizacion automatica
+
+Para publicar el tablero y que ya no tengas que subir archivos manuales:
+
+1. Sube esta carpeta completa a GitHub.
+2. En GitHub entra al repositorio y ve a `Settings > Pages`.
+3. En `Build and deployment`, selecciona `Deploy from a branch`.
+4. Selecciona la rama `main` y carpeta `/root`, luego `Save`.
+5. GitHub te dara una liga tipo `https://usuario.github.io/repositorio/`.
+
+El tablero busca automaticamente `data/sources.json` al abrir. Si ese archivo tiene enlaces publicados de Google Sheets, carga esos datos y se actualiza cada 5 minutos.
+
+Puedes usar un solo enlace del archivo completo si las hojas estan publicadas y conservan sus nombres:
+
+```json
+{
+  "autoRefreshMinutes": 5,
+  "workbook": "https://docs.google.com/spreadsheets/d/ID_DEL_ARCHIVO/edit#gid=0"
+}
+```
+
+O puedes pegar enlaces CSV por hoja cuando alguna pestana necesite su propio `gid`:
+
+```json
+{
+  "autoRefreshMinutes": 5,
+  "avance": "https://docs.google.com/spreadsheets/d/e/ID_PUBLICADO/pub?gid=123&single=true&output=csv",
+  "processSheets": {
+    "calidad_final": "https://docs.google.com/spreadsheets/d/e/ID_PUBLICADO/pub?gid=456&single=true&output=csv"
+  }
+}
+```
+
+Para que el recuadro `Entregado` se actualice solo, publica la pestana `PRUEBAS CALIDADFINALES` como CSV y pega ese enlace en `processSheets.calidad_final`.
+
 Para el archivo `AVANCE DE ENSAMBLE EH150_ABR.2026`, conviene usar `lista de chasis` como fuente de equipos. `LISTA EQUIPOS` es un catalogo mas amplio y no coincide uno a uno con las unidades activas de proceso.
 
 La app tambien acepta enlaces tipo:

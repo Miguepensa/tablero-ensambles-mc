@@ -1,0 +1,21 @@
+{
+  "autoRefreshMinutes": 5,
+  "workbook": "",
+  "equipos": "",
+  "avance": "",
+  "materiales": "",
+  "finanzas": "",
+  "processSheets": {
+    "estructurales": "",
+    "talleres": "",
+    "electrico": "",
+    "hidraulico": "",
+    "pedestal": "",
+    "brazos": "",
+    "pruebas_iniciales": "",
+    "acabado_inicial": "",
+    "pintura_detalles": "",
+    "acabado_final": "",
+    "calidad_final": ""
+  }
+}
