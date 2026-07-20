@@ -2,7 +2,7 @@
   "autoRefreshMinutes": 5,
   "workbook": "",
   "equipos": "",
-  "avance": "data/avance-por-unidad.csv",
+  "avance": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?output=csv",
   "materiales": "",
   "finanzas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8i1AbqPAWsOYPZf0pkwnAui7EsDCt3SoTafqlJtpChJeaoHhUVyuQvAEJFaDcQm3lZpKHRIXT7F2Q/pub?gid=150305124&single=true&output=csv",
   "processSheets": {
