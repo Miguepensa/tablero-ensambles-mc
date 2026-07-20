@@ -233,17 +233,17 @@ async function bootstrapData() {
     state.config = mergeSourceConfigs(publicConfig, state.config);
   }
 
+  await loadBundledAdvanceData();
+
   if (hasConfiguredSources(state.config)) {
-    await loadDriveData({ keepView: true });
+    await loadDriveData({ keepView: true, mergeWithCurrent: true });
     startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
     return;
   }
-
-  await loadBundledAdvanceData();
 }
 
 async function loadDriveData(options = {}) {
-  const { background = false, keepView = false } = options;
+  const { background = false, keepView = false, mergeWithCurrent = true } = options;
   const previousView = state.view;
   const previousSelectedId = state.selectedId;
   state.loading = !background;
@@ -253,7 +253,7 @@ async function loadDriveData(options = {}) {
   }
 
   try {
-    const imported = await buildDatasetFromConfig(state.config);
+    const imported = await buildDatasetFromConfig(state.config, mergeWithCurrent ? state.data : createEmptyDataset());
     state.data = imported;
     state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
       ? previousSelectedId
@@ -1074,6 +1074,10 @@ function createEmptyDataset() {
   });
 }
 
+function cloneDataset(data) {
+  return normalizeDataset(JSON.parse(JSON.stringify(data || createEmptyDataset())));
+}
+
 function getInitialData() {
   return createEmptyDataset();
 }
@@ -1114,7 +1118,7 @@ function createDemoMaterials() {
   });
 }
 
-async function buildDatasetFromConfig(config) {
+async function buildDatasetFromConfig(config, baseData = createEmptyDataset()) {
   const urls = [];
   if (isUsableSourceUrl(config.workbook)) {
     SOURCE_FIELDS.forEach((field) => {
@@ -1145,7 +1149,7 @@ async function buildDatasetFromConfig(config) {
     if (isUsableSourceUrl(url)) urls.push({ kind: `process:${process.id}`, label: process.name, url, process });
   });
 
-  const data = createEmptyDataset();
+  const data = cloneDataset(baseData);
   if (!urls.length) return normalizeDataset(data);
 
   data.source = "Drive / CSV";
@@ -1181,9 +1185,6 @@ async function fetchCsv(inputUrl) {
     if (!response.ok) throw new Error(`HTTP ${response.status} en ${url}`);
     return await response.text();
   } catch (error) {
-    if (isPublishedGoogleSheetsUrl(inputUrl)) {
-      throw new Error("No pude leer el CSV publicado. Revisa que el enlace abra en otra pestana y termine en output=csv.");
-    }
     if (isGoogleSheetsUrl(inputUrl)) return fetchGoogleSheetCsvViaJsonp(inputUrl);
     throw error;
   }
@@ -3159,7 +3160,7 @@ function isUsableSourceUrl(inputUrl) {
   const url = String(inputUrl || "").trim();
   if (!url) return false;
   if (url.endsWith("...") || url.includes("docs.google.com/spreadsheets/...")) return false;
-  if (!/^https?:\/\//i.test(url)) return false;
+  if (!/^https?:\/\//i.test(url) && !/^data\//i.test(url)) return false;
   return true;
 }
 

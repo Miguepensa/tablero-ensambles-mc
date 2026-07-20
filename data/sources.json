@@ -2,9 +2,9 @@
   "autoRefreshMinutes": 5,
   "workbook": "",
   "equipos": "",
-  "avance": "",
+  "avance": "data/avance-por-unidad.csv",
   "materiales": "",
-  "finanzas": "",
+  "finanzas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8i1AbqPAWsOYPZf0pkwnAui7EsDCt3SoTafqlJtpChJeaoHhUVyuQvAEJFaDcQm3lZpKHRIXT7F2Q/pub?gid=150305124&single=true&output=csv",
   "processSheets": {
     "estructurales": "",
     "talleres": "",
@@ -16,6 +16,6 @@
     "acabado_inicial": "",
     "pintura_detalles": "",
     "acabado_final": "",
-    "calidad_final": ""
+    "calidad_final": "data/pruebas-calidad-finales.csv"
   }
 }
