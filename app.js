@@ -512,12 +512,12 @@ function renderDashboardView() {
 
   return `
     <div class="grid metrics">
-      ${renderMetric("Unidades", summary.fixedTotal, "fijas del programa", "en-proceso")}
-      ${renderMetric("Terminadas", summary.finished, `${formatPercent(summary.finishedRate)} del total`, "terminado")}
-      ${renderMetric("En proceso", summary.started, "unidades iniciadas", "en-proceso")}
-      ${renderMetric("Por hacer", summary.notStarted, `${summary.fixedTotal} fijas - ${summary.finished} terminadas`, "pendiente")}
-      ${renderMetric("Entregado", summary.delivered, "check activo en Drive", "terminado")}
-      ${renderMetric("Detenidas", summary.stopped, `${summary.corrections} con correccion`, "detenido")}
+      ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
+      ${renderMetric("Terminadas", summary.finished, "", "terminado")}
+      ${renderMetric("En proceso", summary.started, "", "en-proceso")}
+      ${renderMetric("Por hacer", summary.notStarted, "", "pendiente")}
+      ${renderMetric("Entregado", summary.delivered, "", "terminado")}
+      ${renderMetric("Detenidas", summary.stopped, "", "detenido")}
     </div>
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
@@ -590,7 +590,7 @@ function renderMetric(label, value, note, statusClass) {
       </div>
       <div>
         <p class="metric-value">${value}</p>
-        <p class="metric-note">${note}</p>
+        ${note ? `<p class="metric-note">${note}</p>` : ""}
       </div>
     </article>
   `;
