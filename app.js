@@ -56,6 +56,7 @@ const BUNDLED_UNIT_ADVANCE_CSV = "data/avance-por-unidad.csv";
 const BUNDLED_QUALITY_FINAL_CSV = "data/pruebas-calidad-finales.csv";
 const PUBLIC_SOURCES_URL = "data/sources.json";
 const DEFAULT_AUTO_REFRESH_MINUTES = 5;
+const PROJECT_TOTAL_AMOUNT = 608197933;
 const STORAGE_KEY = "tablero-ensambles-config-v1";
 const app = document.getElementById("app");
 let autoRefreshTimer = null;
@@ -829,6 +830,7 @@ function renderFinanzasView() {
   const rows = getFilteredFinanceRows();
   const financeCharts = getFinanceChartData(rows);
   const financeSummary = getDashboardFinanceSummary(rows);
+  const warrantySummary = getFinanceWarrantySummary(state.data.finanzas || []);
   const moneyTotals = getFinanceMoneyTotals(rows, visibleColumns);
   const zones = getUniqueValues(state.data.finanzas || [], "zona");
   const paymentOptions = getUniqueFinanceFieldValues("fforma_de_pago");
@@ -836,9 +838,13 @@ function renderFinanzasView() {
 
   return `
     <div class="grid finance-dashboard-metrics">
-      ${renderMetric("Saldo pendiente", formatCompactMoney(financeSummary.balance), "filtrado actual", financeSummary.balance > 0 ? "correccion" : "terminado")}
+      ${renderMetric("Monto total del proyecto", formatCurrency(PROJECT_TOTAL_AMOUNT), "monto contratado", "en-proceso")}
       ${renderMetric("Total factura", formatCompactMoney(financeSummary.invoice), "filtrado actual", "en-proceso")}
+      ${renderMetric("Saldo pendiente de la factura", formatCompactMoney(financeSummary.balance), "total del proyecto - total factura", financeSummary.balance > 0 ? "correccion" : "terminado")}
+      ${renderMetric("Monto penalizado", formatCompactMoney(financeSummary.penalized), "filtrado actual", financeSummary.penalized > 0 ? "detenido" : "terminado")}
       ${renderMetric("Monto pagado", formatCompactMoney(financeSummary.paid), "filtrado actual", "terminado")}
+      ${renderMetric("Estatus atendido", warrantySummary.attended, "garantias atendidas · total general", "terminado")}
+      ${renderMetric("Estatus no atendido", warrantySummary.unattended, "garantias por atender · total general", warrantySummary.unattended > 0 ? "correccion" : "terminado")}
     </div>
 
     <section class="panel finance-panel">
@@ -1995,10 +2001,15 @@ function getFinanceSummary(rows) {
 function getFinanceChartData(rows) {
   const balanceKey = getFinanceBalanceKey();
   const totalBalance = rows.reduce((sum, row) => sum + toNumber(row.fields?.[balanceKey]), 0);
+  const financeSummary = getDashboardFinanceSummary(rows);
+  const invoiceAfterPenalty = Math.max(financeSummary.invoice - financeSummary.penalized, 0);
   return {
     totalBalance,
     byZone: groupFinanceMoney(rows, "zona", balanceKey, "Sin zona").slice(0, 8),
-    byPaymentStatus: groupFinanceMoney(rows, "pagada_no_pagada", balanceKey, "Sin estatus"),
+    invoiceComposition: [
+      { label: "Factura sin penalizacion", value: invoiceAfterPenalty },
+      { label: "Monto penalizado", value: financeSummary.penalized },
+    ],
   };
 }
 
@@ -2033,11 +2044,27 @@ function getFinanceMoneyTotals(rows, columns) {
 }
 
 function getDashboardFinanceSummary(rows) {
+  const invoice = sumFinanceByColumnMatch(rows, ["factura"]);
   return {
-    balance: sumFinanceByColumnMatch(rows, ["saldo", "pend"]),
-    invoice: sumFinanceByColumnMatch(rows, ["factura"]),
+    balance: Math.max(PROJECT_TOTAL_AMOUNT - invoice, 0),
+    invoice,
+    penalized: sumFinanceByColumnMatch(rows, ["penal"]),
     paid: sumFinancePaidAmount(rows),
   };
+}
+
+function getFinanceWarrantySummary(rows) {
+  return rows.reduce((summary, row) => {
+    const status = normalizeText(row.fields?.estatus_de_garantias);
+    if (!status) return summary;
+
+    if (status.includes("por atender") || status.includes("no atend")) {
+      summary.unattended += 1;
+    } else if (status.includes("atendid")) {
+      summary.attended += 1;
+    }
+    return summary;
+  }, { attended: 0, unattended: 0 });
 }
 
 function sumFinanceByColumnMatch(rows, terms) {
@@ -2475,14 +2502,14 @@ function renderFinanceCharts(data) {
       <section class="finance-chart">
         <div class="panel-header">
           <div>
-            <p class="panel-label">Saldo pendiente</p>
-            <h3 class="finance-chart-title">Distribucion por pago</h3>
+            <p class="panel-label">Total factura</p>
+            <h3 class="finance-chart-title">Factura y monto penalizado</h3>
           </div>
         </div>
         <div class="finance-donut-layout">
-          ${renderFinanceMoneyDonut(data.byPaymentStatus)}
+          ${renderFinanceMoneyDonut(data.invoiceComposition)}
           <div class="legend">
-            ${data.byPaymentStatus.length ? data.byPaymentStatus.map((item, index) => renderLegendRow(item.label, formatCurrency(item.value), financeChartColor(index))).join("") : `<div class="empty-state">Sin saldos con los filtros actuales.</div>`}
+            ${data.invoiceComposition.map((item, index) => renderLegendRow(item.label, formatCurrency(item.value), financeChartColor(index))).join("")}
           </div>
         </div>
       </section>
@@ -2511,7 +2538,7 @@ function renderFinanceMoneyDonut(items) {
   const total = filtered.reduce((sum, item) => sum + item.value, 0);
   if (!total) {
     return `
-      <svg class="finance-donut" viewBox="0 0 200 200" role="img" aria-label="Sin saldos">
+      <svg class="finance-donut" viewBox="0 0 200 200" role="img" aria-label="Sin facturas ni penalizaciones">
         <circle class="donut-bg" cx="100" cy="100" r="70"></circle>
         <text class="ring-number" x="100" y="102" text-anchor="middle">$0</text>
       </svg>
@@ -2529,11 +2556,11 @@ function renderFinanceMoneyDonut(items) {
   }).join("");
 
   return `
-    <svg class="finance-donut" viewBox="0 0 200 200" role="img" aria-label="Distribucion de saldos por pago">
+    <svg class="finance-donut" viewBox="0 0 200 200" role="img" aria-label="Distribucion de factura y monto penalizado">
       <circle class="donut-bg" cx="100" cy="100" r="${radius}"></circle>
       ${segments}
       <text class="ring-number finance-donut-number" x="100" y="96" text-anchor="middle">${formatCompactMoney(total)}</text>
-      <text class="ring-label" x="100" y="116" text-anchor="middle">SALDO</text>
+      <text class="ring-label" x="100" y="116" text-anchor="middle">FACTURA</text>
     </svg>
   `;
 }
