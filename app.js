@@ -508,16 +508,16 @@ function renderCurrentView() {
 function renderDashboardView() {
   const summary = getSummary(state.data);
   const processStats = getProcessStats(state.data);
-  const statusStats = getStatusStats(state.data);
+  const statusStats = getDashboardStatusStats(summary);
+  const deliveryStats = getFinishedDeliveryStats(summary);
   const alerts = getAlerts(state.data).slice(0, 6);
 
   return `
     <div class="grid metrics">
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
-      ${renderMetric("En proceso", summary.started, "", "en-proceso")}
-      ${renderMetric("Por hacer", summary.notStarted, "", "pendiente")}
-      ${renderMetric("Entregado", summary.delivered, "", "terminado")}
+      ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
+      ${renderMetric("Por hacer", summary.pending, "", "pendiente")}
       ${renderMetric("Detenidas", summary.stopped, "", "detenido")}
     </div>
 
@@ -541,14 +541,14 @@ function renderDashboardView() {
       <section class="panel">
         <div class="panel-header">
           <div>
-            <p class="panel-label">Estatus</p>
-            <h2 class="panel-title">Distribucion de unidades</h2>
+            <p class="panel-label">Unidades terminadas</p>
+            <h2 class="panel-title">Estatus de entrega</h2>
           </div>
         </div>
         <div class="donut-wrap">
-          ${renderDonut(statusStats)}
+          ${renderDonut(deliveryStats, "TERMINADAS", "Estatus de entrega de gruas terminadas")}
           <div class="legend">
-            ${statusStats.map((item) => renderLegendRow(item.label, `${item.count} unidades`, item.color)).join("")}
+            ${deliveryStats.map((item) => renderLegendRow(item.label, `${item.count} unidades`, item.color)).join("")}
           </div>
         </div>
       </section>
@@ -1798,18 +1798,26 @@ function getSummary(data) {
   let doneActivities = 0;
   let totalActivities = 0;
   let corrections = 0;
-  let started = 0;
   equipos.forEach((equipo) => {
     const totals = progressTotals(getEquipmentProgress(data, equipo.id));
     doneActivities += totals.done;
     totalActivities += totals.total;
     corrections += totals.corrections;
-    if (totals.done > 0 || totals.corrections > 0) started += 1;
   });
 
   const fixedTotal = Number(data.meta?.equipos) || equipos.length || 170;
-  const finished = equipos.filter((equipo) => equipo.status === "terminado").length;
-  const stopped = equipos.filter((equipo) => equipo.status === "detenido").length;
+  const finishedIds = new Set(
+    equipos
+      .filter((equipo) => progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
+      .map((equipo) => equipo.id)
+  );
+  const finished = finishedIds.size;
+  const stopped = equipos.filter((equipo) => !finishedIds.has(equipo.id) && equipo.status === "detenido").length;
+  const inProgress = equipos.filter((equipo) => {
+    if (finishedIds.has(equipo.id) || equipo.status === "detenido") return false;
+    return equipo.status === "en_proceso" || equipo.status === "correccion";
+  }).length;
+  const pending = Math.max(fixedTotal - finished - inProgress - stopped, 0);
   const delivered = getDeliveredCount(data);
   return {
     total: fixedTotal,
@@ -1818,9 +1826,8 @@ function getSummary(data) {
     finished,
     stopped,
     delivered,
-    started,
-    notStarted: Math.max(fixedTotal - finished, 0),
-    inProgress: equipos.filter((equipo) => equipo.status === "en_proceso").length,
+    pending,
+    inProgress,
     corrections: equipos.filter((equipo) => equipo.status === "correccion").length,
     materialShortage: (data.materiales || []).filter((item) => item.pendiente > 0).length,
     doneActivities,
@@ -2013,6 +2020,23 @@ function getFinanceChartData(rows) {
   };
 }
 
+function getDashboardStatusStats(summary) {
+  return [
+    { key: "terminado", label: "Terminado", count: summary.finished, color: STATUS.terminado.color },
+    { key: "en_proceso", label: "En proceso", count: summary.inProgress, color: STATUS.en_proceso.color },
+    { key: "pendiente", label: "Pendiente", count: summary.pending, color: STATUS.pendiente.color },
+    { key: "detenido", label: "Detenido", count: summary.stopped, color: STATUS.detenido.color },
+  ].filter((item) => item.count > 0);
+}
+
+function getFinishedDeliveryStats(summary) {
+  const delivered = Math.min(summary.delivered, summary.finished);
+  return [
+    { key: "por_entregar", label: "Terminadas por entregar", count: Math.max(summary.finished - delivered, 0), color: STATUS.en_proceso.color },
+    { key: "entregadas", label: "Entregadas", count: delivered, color: STATUS.terminado.color },
+  ];
+}
+
 function getFinanceBalanceKey() {
   const columns = getFinanceColumns();
   const saldo = columns.find((column) => column.key.includes("saldo") && column.key.includes("pend"));
@@ -2192,8 +2216,9 @@ function renderProgressRing(percent, label) {
   `;
 }
 
-function renderDonut(items) {
-  const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
+function renderDonut(items, centerLabel = "UNIDADES", ariaLabel = "Distribucion por estatus") {
+  const itemTotal = items.reduce((sum, item) => sum + item.count, 0);
+  const total = itemTotal || 1;
   let offset = 0;
   const radius = 70;
   const circumference = 2 * Math.PI * radius;
@@ -2204,11 +2229,11 @@ function renderDonut(items) {
     return segment;
   }).join("");
   return `
-    <svg class="donut" viewBox="0 0 200 200" role="img" aria-label="Distribucion por estatus">
+    <svg class="donut" viewBox="0 0 200 200" role="img" aria-label="${escapeAttr(ariaLabel)}">
       <circle class="donut-bg" cx="100" cy="100" r="${radius}"></circle>
       ${segments}
-      <text class="ring-number" x="100" y="98" text-anchor="middle">${total}</text>
-      <text class="ring-label" x="100" y="120" text-anchor="middle">UNIDADES</text>
+      <text class="ring-number" x="100" y="98" text-anchor="middle">${itemTotal}</text>
+      <text class="ring-label" x="100" y="120" text-anchor="middle">${escapeHtml(centerLabel)}</text>
     </svg>
   `;
 }
