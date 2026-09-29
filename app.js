@@ -517,8 +517,6 @@ function renderDashboardView() {
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
-      ${renderMetric("Por hacer", summary.pending, "", "pendiente")}
-      ${renderMetric("Detenidas", summary.stopped, "", "detenido")}
     </div>
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
