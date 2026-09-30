@@ -6,16 +6,16 @@
   "materiales": "",
   "finanzas": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8i1AbqPAWsOYPZf0pkwnAui7EsDCt3SoTafqlJtpChJeaoHhUVyuQvAEJFaDcQm3lZpKHRIXT7F2Q/pub?gid=150305124&single=true&output=csv",
   "processSheets": {
-    "estructurales": "",
-    "talleres": "",
-    "electrico": "",
-    "hidraulico": "",
-    "pedestal": "",
-    "brazos": "",
-    "pruebas_iniciales": "",
-    "acabado_inicial": "",
-    "pintura_detalles": "",
-    "acabado_final": "",
+    "estructurales": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1012371333&single=true&output=csv",
+    "talleres": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1699390648&single=true&output=csv",
+    "electrico": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=559237235&single=true&output=csv",
+    "hidraulico": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1533914315&single=true&output=csv",
+    "pedestal": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1576986440&single=true&output=csv",
+    "brazos": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=781151593&single=true&output=csv",
+    "pruebas_iniciales": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1614026882&single=true&output=csv",
+    "acabado_inicial": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=424303979&single=true&output=csv",
+    "pintura_detalles": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=424303979&single=true&output=csv",
+    "acabado_final": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=424303979&single=true&output=csv",
     "calidad_final": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBVachAChQvG5v-zz-SBMN8aZYzD47mcdszP637OAj3F9mvDTanE8_2sWfZCSlm0-qY5QhgEgU8sTw/pub?gid=1495972782&single=true&output=csv"
   }
 }

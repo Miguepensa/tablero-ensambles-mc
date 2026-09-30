@@ -524,6 +524,462 @@ button {
   gap: 14px;
 }
 
+.process-time-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.process-time-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.process-time-title {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+
+.process-time-table-wrap {
+  box-shadow: none;
+}
+
+.process-time-table {
+  min-width: 900px;
+}
+
+.process-time-table th,
+.process-time-table td {
+  padding: 12px 14px;
+  text-align: right;
+}
+
+.process-time-table th:first-child,
+.process-time-table td:first-child {
+  text-align: left;
+}
+
+.process-time-highlight td {
+  background: #edf7fd;
+}
+
+.process-time-highlight td:first-child {
+  border-left: 4px solid var(--mc-blue);
+}
+
+.time-source-error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.process-time-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hours-filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(180px, 0.6fr) minmax(240px, 1fr);
+  gap: 14px;
+}
+
+.assembly-time-panel {
+  overflow: hidden;
+}
+
+.assembly-time-header {
+  align-items: flex-start;
+}
+
+.assembly-time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.assembly-time-card {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--mc-blue);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
+}
+
+.assembly-time-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.assembly-time-name {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.assembly-time-count {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.assembly-time-per-unit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(31, 120, 184, 0.2);
+  border-radius: 6px;
+  background: rgba(31, 120, 184, 0.07);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.assembly-time-per-unit strong {
+  color: var(--mc-blue-dark, var(--mc-blue));
+  font-size: 12px;
+}
+
+.assembly-gauge {
+  position: relative;
+  width: min(100%, 170px);
+  margin: 10px auto 2px;
+}
+
+.assembly-gauge svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.assembly-gauge path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 10;
+}
+
+.assembly-gauge-track {
+  stroke: #dfe9ef;
+}
+
+.assembly-gauge-value {
+  stroke: var(--mc-blue);
+  filter: drop-shadow(0 2px 2px rgba(24, 74, 108, 0.15));
+}
+
+.assembly-gauge-reading {
+  position: absolute;
+  inset: auto 0 1px;
+  display: grid;
+  justify-items: center;
+  line-height: 1;
+}
+
+.assembly-gauge-reading strong {
+  font-size: 23px;
+  white-space: nowrap;
+}
+
+.assembly-gauge-reading span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.assembly-time-breakdown {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.assembly-time-line,
+.assembly-time-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.assembly-time-line span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.assembly-time-line i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mc-blue);
+}
+
+.assembly-time-line.pending i {
+  background: #b9c6cf;
+}
+
+.assembly-time-line strong,
+.assembly-time-total strong {
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.assembly-time-total {
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+  font-weight: 700;
+}
+
+.assembly-time-warning {
+  margin: 8px 0 0;
+  color: #92500f;
+  font-size: 10px;
+}
+
+.assembly-time-footnote {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 1260px) {
+  .assembly-time-grid {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .assembly-time-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .assembly-time-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assembly-time-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 130px;
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .assembly-time-card .assembly-time-breakdown,
+  .assembly-time-card .assembly-time-warning {
+    grid-column: 1 / -1;
+  }
+}
+
+.hours-selected-line {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--mc-blue);
+  border-radius: 4px;
+  background: #f3f8fc;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hours-selected-line strong {
+  color: var(--text);
+}
+
+.hours-summary-bars,
+.hours-activity-bars {
+  display: grid;
+  gap: 12px;
+}
+
+.hours-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.badge.warning {
+  color: #92500f;
+  border-color: rgba(240, 138, 36, 0.42);
+  background: rgba(240, 138, 36, 0.12);
+}
+
+.hours-bar-row {
+  display: grid;
+  grid-template-columns: 118px minmax(220px, 1fr) 48px 140px;
+  gap: 14px;
+  align-items: center;
+}
+
+.hours-bar-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.hours-bar-track {
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid #d3e0e9;
+  border-radius: 999px;
+  background: #e8f0f5;
+}
+
+.hours-bar-fill {
+  width: var(--hours-value);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.hours-bar-row.pending .hours-bar-fill {
+  background: var(--orange);
+}
+
+.hours-bar-percent,
+.hours-bar-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hours-bar-percent {
+  font-size: 13px;
+}
+
+.hours-bar-value {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hours-activity-list {
+  display: grid;
+  gap: 12px;
+}
+
+.hours-activity-item {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.hours-activity-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.hours-activity-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.hours-activity-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hours-missing-time {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--orange);
+  background: rgba(240, 138, 36, 0.08);
+  color: #7a4a19;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .hours-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .hours-bar-row {
+    grid-template-columns: 96px minmax(120px, 1fr) 42px;
+  }
+
+  .hours-bar-value {
+    grid-column: 2 / 4;
+  }
+}
+
+.structural-time-detail {
+  margin-top: 16px;
+  border: 1px solid rgba(31, 120, 184, 0.22);
+  border-radius: 8px;
+  background: #f8fbfd;
+  overflow: hidden;
+}
+
+.structural-time-detail summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.structural-time-detail summary strong {
+  color: var(--mc-blue);
+  font-size: 13px;
+}
+
+.structural-time-table-wrap {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.structural-time-table {
+  min-width: 720px;
+}
+
+.structural-time-table th,
+.structural-time-table td {
+  padding: 10px 14px;
+}
+
+.structural-time-table th:first-child,
+.structural-time-table td:first-child {
+  width: 52px;
+  text-align: center;
+}
+
+.structural-time-table th:last-child,
+.structural-time-table td:last-child {
+  width: 120px;
+  text-align: right;
+}
+
+.structural-time-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: #edf7fd;
+  border-top: 2px solid rgba(31, 120, 184, 0.35);
+}
+
 .process-summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1307,7 +1763,8 @@ button {
   }
 
   .topbar,
-  .panel-header {
+  .panel-header,
+  .process-time-heading {
     flex-direction: column;
     align-items: stretch;
   }

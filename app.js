@@ -17,6 +17,7 @@ const VIEWS = [
   { id: "equipos", label: "Equipos", icon: "E" },
   { id: "detalle", label: "Detalle", icon: "U" },
   { id: "captura", label: "Captura", icon: "C" },
+  { id: "horas", label: "Horas", icon: "H" },
   { id: "materiales", label: "Materiales", icon: "M" },
   { id: "finanzas", label: "Finanzas", icon: "F" },
   { id: "config", label: "Conexion", icon: "X" },
@@ -57,6 +58,30 @@ const BUNDLED_QUALITY_FINAL_CSV = "data/pruebas-calidad-finales.csv";
 const PUBLIC_SOURCES_URL = "data/sources.json";
 const DEFAULT_AUTO_REFRESH_MINUTES = 5;
 const PROJECT_TOTAL_AMOUNT = 608197933;
+const STRUCTURAL_ACTIVITY_TIMES = [
+  { name: "Barrenar angulos de defensa", minutes: 30 },
+  { name: "Corte de chasis", minutes: 20 },
+  { name: "Montaje de defensa", minutes: 60 },
+  { name: "Barrenar chasis para placas de sujecion de carroceria", minutes: 90 },
+  { name: "Instalacion y torque de tornillos de placas de sujecion de carroceria", minutes: 60 },
+  { name: "Montaje de carroceria", minutes: 30 },
+  { name: "Soldar placas de sujecion a la carroceria", minutes: 90 },
+  { name: "Pintar las placas y angulos despues de soldar", minutes: 10 },
+  { name: "Barrenar chasis de angulo de sujecion de estabilizadores", minutes: 60 },
+  { name: "Instalacion y torque de tornillos de angulo de sujecion de estabilizadores", minutes: 20 },
+  { name: "Recorrer eje trasero y alargar cardan", minutes: 180 },
+  { name: "Soldar placas de valvulas estabilizadores", minutes: 20 },
+  { name: "Instalacion de camisas y zapatas delanteros", minutes: 60 },
+  { name: "Instalacion de camisas y zapatas traseros", minutes: 60 },
+  { name: "Ensamble de cilindro con camisa, zapatas y perno inferior (lado chofer y copiloto)", minutes: 30 },
+  { name: "Ensamble de cilindros en base de estabilizador tipo A e instalacion de perno superior", minutes: 30 },
+  { name: "Instalacion rack placas de sustentacion", minutes: 30 },
+  { name: "Montaje de bisagras para caja de muerto (2 piezas)", minutes: 20 },
+  { name: "Soldar tornillos a soporte brazo inferior para matraca", minutes: 5 },
+  { name: "Instalacion angulo tornamesa sujecion mangueras", minutes: 30 },
+  { name: "Soldar protector de valvula de control en tornamesa", minutes: 20 },
+];
+const STRUCTURAL_TOTAL_MINUTES = STRUCTURAL_ACTIVITY_TIMES.reduce((sum, activity) => sum + activity.minutes, 0);
 const STORAGE_KEY = "tablero-ensambles-config-v1";
 const app = document.getElementById("app");
 let autoRefreshTimer = null;
@@ -67,6 +92,9 @@ let state = {
   selectedId: null,
   captureProcess: "estructurales",
   captureStatus: "todos",
+  hoursProcess: "estructurales",
+  hoursVinQuery: "",
+  hoursActivityQuery: "",
   filters: {
     status: "todos",
     division: "todos",
@@ -211,6 +239,28 @@ app.addEventListener("input", (event) => {
     state.captureStatus = target.value;
     render();
   }
+
+  if (target.matches("[data-hours-process]")) {
+    state.hoursProcess = target.value;
+    render();
+  }
+
+  if (target.matches("[data-hours-vin]")) {
+    state.hoursVinQuery = target.value;
+    const query = normalizeText(target.value);
+    const equipo = state.data.equipos.find((item) =>
+      [item.vin, item.control, item.id].some((value) => normalizeText(value) === query)
+    );
+    if (equipo && equipo.id !== state.selectedId) {
+      state.selectedId = equipo.id;
+      render();
+    }
+  }
+
+  if (target.matches("[data-hours-activity-query]")) {
+    state.hoursActivityQuery = target.value;
+    render();
+  }
 });
 
 app.addEventListener("change", (event) => {
@@ -218,6 +268,18 @@ app.addEventListener("change", (event) => {
   if (target.matches("[data-finance-column]")) {
     updateFinanceVisibleColumns(target.dataset.financeColumn, target.checked);
     render();
+  }
+
+  if (target.matches("[data-hours-vin]")) {
+    const query = normalizeText(target.value);
+    const equipo = state.data.equipos.find((item) =>
+      [item.vin, item.control, item.id].some((value) => normalizeText(value) === query)
+    );
+    if (equipo) {
+      state.selectedId = equipo.id;
+      state.hoursVinQuery = equipo.vin || equipo.control;
+      render();
+    }
   }
 
   if (target.matches("[data-file-import]")) {
@@ -488,6 +550,7 @@ function renderKicker(view) {
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
     detalle: "Avance por proceso, cobertura de actividades y datos principales de la unidad.",
     captura: "Registro rapido de actividades por proceso para la unidad seleccionada.",
+    horas: "Horas realizadas y pendientes calculadas por actividad, con consulta por VIN.",
     materiales: "Inventario, requisiciones, entregas, faltantes y cobertura por material.",
     finanzas: `${(state.data.finanzas || []).length} registros financieros vinculados por VIN, almacen y zona. Fuente: ${escapeHtml(state.data.financeSource || "Excel local")}.`,
     config: "URLs CSV publicadas desde Drive y carga manual de archivos CSV.",
@@ -499,6 +562,7 @@ function renderCurrentView() {
   if (state.view === "equipos") return renderEquiposView();
   if (state.view === "detalle") return renderDetalleView();
   if (state.view === "captura") return renderCapturaView();
+  if (state.view === "horas") return renderHorasView();
   if (state.view === "materiales") return renderMaterialesView();
   if (state.view === "finanzas") return renderFinanzasView();
   if (state.view === "config") return renderConfigView();
@@ -508,9 +572,9 @@ function renderCurrentView() {
 function renderDashboardView() {
   const summary = getSummary(state.data);
   const processStats = getProcessStats(state.data);
+  const assemblyTimeStats = getDashboardAssemblyTimeStats();
   const statusStats = getDashboardStatusStats(summary);
   const deliveryStats = getFinishedDeliveryStats(summary);
-  const alerts = getAlerts(state.data).slice(0, 6);
 
   return `
     <div class="grid metrics">
@@ -563,20 +627,96 @@ function renderDashboardView() {
         </div>
         ${renderProcessFocus(processStats)}
       </section>
-
-      <section class="panel alert-panel">
-        <div class="panel-header">
-          <div>
-            <p class="panel-label">Alertas</p>
-            <h2 class="panel-title">Puntos de atencion</h2>
-          </div>
-          <span class="badge">${summary.alerts}</span>
-        </div>
-        <div class="alert-list">
-          ${alerts.length ? alerts.map(renderAlert).join("") : `<div class="empty-state">Sin alertas abiertas.</div>`}
-        </div>
-      </section>
     </div>
+
+    ${renderDashboardAssemblyTimes(assemblyTimeStats)}
+  `;
+}
+
+function getDashboardAssemblyTimeStats() {
+  return PROCESS_DEFS.map((process) => {
+    const activities = getHoursActivityStats(process);
+    const validActivities = activities.filter((item) => item.timeValid);
+    const workedMinutes = validActivities.reduce((sum, item) => sum + item.doneMinutes, 0);
+    const pendingMinutes = validActivities.reduce((sum, item) => sum + item.pendingMinutes, 0);
+    const minutesPerUnit = validActivities.reduce((sum, item) => sum + item.minutes, 0);
+    return {
+      ...process,
+      activityCount: activities.length,
+      timedActivities: validActivities.length,
+      missingTimes: Math.max(activities.length - validActivities.length, 0),
+      workedMinutes,
+      pendingMinutes,
+      totalMinutes: workedMinutes + pendingMinutes,
+      minutesPerUnit,
+    };
+  }).filter((item) => item.activityCount > 0);
+}
+
+function renderDashboardAssemblyTimes(items) {
+  if (!items.length) return "";
+
+  return `
+    <section class="panel assembly-time-panel" style="margin-top: 14px;">
+      <div class="panel-header assembly-time-header">
+        <div>
+          <p class="panel-label">Horas por ensamble</p>
+          <h2 class="panel-title">Horas trabajadas y pendientes</h2>
+          <p class="panel-subtitle">Acumulado general de las 171 grúas para cada ensamble.</p>
+        </div>
+        <span class="badge">${items.length} áreas con tiempos</span>
+      </div>
+      <div class="assembly-time-grid">
+        ${items.map((item) => renderAssemblyTimeGauge(item)).join("")}
+      </div>
+      <p class="assembly-time-footnote">Azul: horas ya trabajadas. Gris: horas que faltan. Los cálculos usan los tiempos y avances registrados en Drive.</p>
+    </section>
+  `;
+}
+
+function renderAssemblyTimeGauge(item) {
+  const percent = item.totalMinutes > 0
+    ? clamp((item.workedMinutes / item.totalMinutes) * 100, 0, 100)
+    : 0;
+  const completeness = item.activityCount > 0 ? item.timedActivities / item.activityCount : 0;
+  const title = item.name;
+
+  return `
+    <article class="assembly-time-card">
+      <div class="assembly-time-card-top">
+        <div>
+          <p class="assembly-time-name">${escapeHtml(title)}</p>
+          <p class="assembly-time-count">${item.timedActivities} de ${item.activityCount} actividades con tiempo</p>
+          <p class="assembly-time-per-unit"><span>Tiempo por ensamble</span><strong class="mono">${formatClockMinutes(item.minutesPerUnit)}</strong></p>
+        </div>
+        ${item.missingTimes ? `<span class="badge warning">${item.missingTimes} sin tiempo</span>` : ""}
+      </div>
+      <div class="assembly-gauge" role="img" aria-label="${escapeAttr(`${title}: ${formatWorkDuration(item.workedMinutes)} trabajadas y ${formatWorkDuration(item.pendingMinutes)} pendientes`)}">
+        <svg viewBox="0 0 120 66" aria-hidden="true">
+          <path class="assembly-gauge-track" pathLength="100" d="M10 58 A50 50 0 0 1 110 58"></path>
+          <path class="assembly-gauge-value" pathLength="100" stroke-dasharray="${percent} 100" d="M10 58 A50 50 0 0 1 110 58"></path>
+        </svg>
+        <div class="assembly-gauge-reading">
+          <strong>${Math.round(percent)}%</strong>
+          <span>trabajado</span>
+        </div>
+      </div>
+      <div class="assembly-time-breakdown">
+        <div class="assembly-time-line worked">
+          <span><i></i>Horas trabajadas</span>
+          <strong class="mono">${formatWorkDuration(item.workedMinutes)}</strong>
+        </div>
+        <div class="assembly-time-line pending">
+          <span><i></i>Horas pendientes</span>
+          <strong class="mono">${formatWorkDuration(item.pendingMinutes)}</strong>
+        </div>
+        <div class="assembly-time-total">
+          <span>Total estimado</span>
+          <strong class="mono">${formatWorkDuration(item.totalMinutes)}</strong>
+        </div>
+      </div>
+      ${completeness < 1 ? `<p class="assembly-time-warning">El total no incluye actividades sin duración.</p>` : ""}
+    </article>
   `;
 }
 
@@ -778,6 +918,192 @@ function renderCapturaView() {
           `).join("")}
         </div>
       </section>
+    </div>
+  `;
+}
+
+function renderHorasView() {
+  const process = PROCESS_DEFS.find((item) => item.id === state.hoursProcess) || PROCESS_DEFS[0];
+  const selected = getSelectedEquipo();
+  const allStats = getHoursActivityStats(process);
+  const activityQuery = normalizeText(state.hoursActivityQuery);
+  const rows = activityQuery
+    ? allStats.filter((item) => normalizeText(`${item.name} ${item.subprocess}`).includes(activityQuery))
+    : allStats;
+  const totalDoneMinutes = allStats.reduce((sum, item) => sum + item.doneMinutes, 0);
+  const totalPendingMinutes = allStats.reduce((sum, item) => sum + item.pendingMinutes, 0);
+  const totalHoursMinutes = totalDoneMinutes + totalPendingMinutes;
+  const missingTimeCount = allStats.filter((item) => !item.timeValid).length;
+
+  return `
+    <section class="panel hours-control-panel">
+      <div class="hours-filters">
+        <label class="field">
+          <span class="field-label">Buscar VIN o equipo</span>
+          <input class="input" data-hours-vin list="hours-vin-list" value="${escapeAttr(state.hoursVinQuery || selected?.vin || selected?.control || "")}" placeholder="Escribe o selecciona un VIN" />
+          <datalist id="hours-vin-list">
+            ${state.data.equipos.map((equipo) => `<option value="${escapeAttr(equipo.vin || equipo.control)}">${escapeHtml(equipo.control)}</option>`).join("")}
+          </datalist>
+        </label>
+        <label class="field">
+          <span class="field-label">Area</span>
+          <select class="select" data-hours-process>
+            ${PROCESS_DEFS.map((item) => {
+              const available = getHoursDefinitions(item).length > 0;
+              return `<option value="${item.id}" ${item.id === process.id ? "selected" : ""} ${available ? "" : "disabled"}>${escapeHtml(item.name)}${available ? "" : " (sin datos)"}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Buscar actividad</span>
+          <input class="input" data-hours-activity-query value="${escapeAttr(state.hoursActivityQuery)}" placeholder="Ej. barrenado, chasis..." />
+        </label>
+      </div>
+      ${selected ? `<p class="hours-selected-line"><strong>${escapeHtml(selected.control)}</strong> · <span class="mono">${escapeHtml(selected.vin || "-")}</span> · ${escapeHtml(selected.division || "-")}</p>` : ""}
+    </section>
+
+    <section class="panel hours-summary-panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Resumen de horas</p>
+          <h2 class="panel-title">${escapeHtml(process.name)}</h2>
+        </div>
+        <div class="hours-summary-badges">
+          <span class="badge">${rows.length} actividades</span>
+          ${missingTimeCount ? `<span class="badge warning">${missingTimeCount} sin tiempo</span>` : ""}
+        </div>
+      </div>
+      <div class="hours-summary-bars">
+        ${renderHoursBar("Horas hechas", totalDoneMinutes, totalHoursMinutes, "done")}
+        ${renderHoursBar("Horas por hacer", totalPendingMinutes, totalHoursMinutes, "pending")}
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Actividades</p>
+          <h2 class="panel-title">Horas hechas y por hacer</h2>
+        </div>
+      </div>
+      ${rows.length ? `
+        <div class="hours-activity-list">
+          ${rows.map((item) => renderHoursActivityBars(item)).join("")}
+        </div>
+      ` : `<div class="empty-state">No hay actividades detalladas para esta area. Conecta su pestaña de Drive para calcular las horas por VIN.</div>`}
+    </section>
+  `;
+}
+
+function getHoursActivityStats(process) {
+  const equipment = state.data.equipos || [];
+  const definitions = getHoursDefinitions(process);
+  const selected = getSelectedEquipo();
+
+  return definitions.map((definition, index) => {
+    let done = 0;
+    let corrections = 0;
+    let selectedState = "sin_dato";
+
+    equipment.forEach((equipo) => {
+      const activities = state.data.activities?.[`${equipo.id}:${process.id}`] || [];
+      const activity = activities[index] || activities.find((item) => normalizeText(item.name) === normalizeText(definition.name));
+      if (activity?.state === "hecho") done += 1;
+      if (activity?.state === "correccion") corrections += 1;
+      if (selected && equipo.id === selected.id && activity) selectedState = activity.state;
+    });
+
+    const minutes = getValidatedActivityMinutes(process.id, definition.name, definition.minutes, index);
+    const timeValid = Number.isFinite(minutes) && minutes >= 0;
+    const pending = Math.max(equipment.length - done, 0);
+    return {
+      ...definition,
+      minutes,
+      done,
+      pending,
+      corrections,
+      selectedState,
+      timeValid,
+      doneMinutes: timeValid ? done * minutes : 0,
+      pendingMinutes: timeValid ? pending * minutes : 0,
+    };
+  });
+}
+
+function getHoursDefinitions(process) {
+  const configured = state.data.activityDefinitions?.[process.id] || [];
+  if (configured.length) {
+    if (process.id === "estructurales") {
+      return STRUCTURAL_ACTIVITY_TIMES.map((validated, index) => {
+        const exact = configured.find((item) => activityNameKey(item.name) === activityNameKey(validated.name));
+        const definition = exact || configured[index] || {};
+        return {
+          ...definition,
+          id: definition.id || `estructurales-${index + 1}`,
+          name: definition.name || validated.name,
+          subprocess: definition.subprocess || process.name,
+          minutes: validated.minutes,
+        };
+      });
+    }
+    return configured;
+  }
+  const firstKey = Object.keys(state.data.activities || {}).find((key) => key.endsWith(`:${process.id}`));
+  return firstKey ? state.data.activities[firstKey].map(({ id, name, subprocess, minutes }) => ({ id, name, subprocess, minutes })) : [];
+}
+
+function getValidatedActivityMinutes(processId, name, fallback, index = -1) {
+  if (processId === "estructurales") {
+    const match = STRUCTURAL_ACTIVITY_TIMES.find((item) => activityNameKey(item.name) === activityNameKey(name)) || STRUCTURAL_ACTIVITY_TIMES[index];
+    if (match) return match.minutes;
+  }
+  return Number.isFinite(Number(fallback)) ? Number(fallback) : Number.NaN;
+}
+
+function activityNameKey(value) {
+  return normalizeText(value)
+    .replace(/sujeccion/g, "sujecion")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function renderHoursActivityBars(item) {
+  const selectedLabel = {
+    hecho: "Hecha",
+    pendiente: "Pendiente",
+    correccion: "Correccion",
+    sin_dato: "Sin dato",
+  }[item.selectedState] || "Sin dato";
+  const selectedClass = item.selectedState === "hecho" ? "terminado" : item.selectedState === "correccion" ? "correccion" : "pendiente";
+  const totalMinutes = item.doneMinutes + item.pendingMinutes;
+
+  return `
+    <article class="hours-activity-item">
+      <div class="hours-activity-heading">
+        <div>
+          <h3>${escapeHtml(item.name)}</h3>
+          <p>${item.timeValid ? `${formatClockMinutes(item.minutes)} por unidad` : "Tiempo sin definir en Drive"}</p>
+        </div>
+        <span class="status ${selectedClass}">VIN: ${selectedLabel}</span>
+      </div>
+      ${item.timeValid ? `
+        <div class="hours-activity-bars">
+          ${renderHoursBar("Horas hechas", item.doneMinutes, totalMinutes, "done")}
+          ${renderHoursBar("Horas por hacer", item.pendingMinutes, totalMinutes, "pending")}
+        </div>
+      ` : `<p class="hours-missing-time">No se incluye en los totales hasta que Drive tenga un tiempo válido.</p>`}
+    </article>
+  `;
+}
+
+function renderHoursBar(label, minutes, totalMinutes, kind) {
+  const percent = totalMinutes > 0 ? clamp((minutes / totalMinutes) * 100, 0, 100) : 0;
+  return `
+    <div class="hours-bar-row ${kind}">
+      <span class="hours-bar-label">${label}</span>
+      <div class="hours-bar-track"><div class="hours-bar-fill" style="--hours-value:${percent}%;"></div></div>
+      <strong class="hours-bar-percent">${Math.round(percent)}%</strong>
+      <span class="hours-bar-value mono">${formatWorkDuration(minutes)}</span>
     </div>
   `;
 }
@@ -1073,6 +1399,7 @@ function createEmptyDataset() {
     activityDefinitions: {},
     activityStates: {},
     deliveredChecks: {},
+    processTimes: {},
     updatedAt: new Date().toISOString(),
     meta: { equipos: 170 },
   });
@@ -1228,6 +1555,7 @@ function applyCsvToDataset(data, kind, text) {
     if (mcAvance.equipos.length) {
       data.equipos = mergeEquipoRows(data.equipos, mcAvance.equipos);
       data.progress = mcAvance.progress;
+      data.processTimes = mcAvance.processTimes || {};
       data.activityStates = {};
       return;
     }
@@ -1242,6 +1570,9 @@ function applyCsvToDataset(data, kind, text) {
     const parsed = parseProcessCsv(text, process);
     mergeProgress(data.progress, parsed.progress);
     data.activities = { ...data.activities, ...parsed.activities };
+    if (parsed.activityDefinitions?.length) {
+      data.activityDefinitions = { ...data.activityDefinitions, [processId]: parsed.activityDefinitions };
+    }
     data.deliveredChecks = { ...(data.deliveredChecks || {}), ...(parsed.delivered || {}) };
   }
 }
@@ -1530,7 +1861,7 @@ function isMcGeneralActivityValue(value) {
 
 function parseMcAvanceRows(rows) {
   const dataStart = rows.findIndex((row) => row.some(isEquipmentCode));
-  if (dataStart < 0) return { equipos: [], progress: {} };
+  if (dataStart < 0) return { equipos: [], progress: {}, processTimes: {} };
   const statusColumn = findMcStatusColumn(rows, dataStart);
 
   const processColumns = {
@@ -1590,7 +1921,57 @@ function parseMcAvanceRows(rows) {
     });
   });
 
-  return { equipos, progress };
+  return { equipos, progress, processTimes: parseMcProcessTimes(rows.slice(0, dataStart)) };
+}
+
+function parseMcProcessTimes(headerRows) {
+  const hoursRowIndex = headerRows.findIndex((row) => row.some((value) => normalizeKey(value) === "horas"));
+  if (hoursRowIndex <= 0) return {};
+
+  const labelRow = headerRows[hoursRowIndex - 1] || [];
+  const hoursRow = headerRows[hoursRowIndex] || [];
+  const result = {};
+
+  labelRow.forEach((label, column) => {
+    const processId = processIdFromSummaryLabel(label);
+    if (!processId) return;
+    const raw = String(hoursRow[column] || "").trim();
+    const minutes = parseDriveDurationMinutes(raw);
+    const suspicious = Number.isFinite(minutes) && minutes > 1000 * 60;
+    result[processId] = { raw, minutes, valid: Number.isFinite(minutes) && !suspicious, suspicious };
+  });
+
+  result.estructurales = {
+    raw: formatClockMinutes(STRUCTURAL_TOTAL_MINUTES),
+    minutes: STRUCTURAL_TOTAL_MINUTES,
+    valid: true,
+    suspicious: false,
+    source: "detalle_actividades",
+  };
+
+  return result;
+}
+
+function processIdFromSummaryLabel(value) {
+  const key = normalizeKey(value);
+  if (key.includes("estructural")) return "estructurales";
+  if (key.includes("taller")) return "talleres";
+  if (key.includes("electric")) return "electrico";
+  if (key.includes("inferior")) return "hidraulico";
+  if (key.includes("pedest") || key.includes("tornam")) return "pedestal";
+  if (key.includes("brz") || key.includes("nivel")) return "brazos";
+  if (key.includes("pruebas_inicial")) return "pruebas_iniciales";
+  if (key.includes("acabado_inicial")) return "acabado_inicial";
+  if (key.includes("pintura")) return "pintura_detalles";
+  if (key.includes("acabado_final")) return "acabado_final";
+  if (key.includes("calidad") || key.includes("finales")) return "calidad_final";
+  return "";
+}
+
+function parseDriveDurationMinutes(value) {
+  const match = String(value || "").trim().match(/^(\d+):(\d{1,2})(?:[:.]\d{1,2})?$/);
+  if (!match) return Number.NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 function findMcStatusColumn(rows, dataStart) {
@@ -1676,6 +2057,7 @@ function normalizeDataset(data) {
   data.activityDefinitions = data.activityDefinitions || {};
   data.activityStates = data.activityStates || {};
   data.deliveredChecks = data.deliveredChecks || {};
+  data.processTimes = data.processTimes || {};
 
   syncEquiposFromFinance(data);
 
@@ -2305,6 +2687,109 @@ function renderProcessFocus(processStats) {
       </div>
     </div>
   `;
+}
+
+function renderProcessTimeTable(processStats, processTimes) {
+  return `
+    <div class="process-time-section">
+      <div class="process-time-heading">
+        <div>
+          <p class="panel-label">Carga pendiente</p>
+          <h3 class="process-time-title">Tiempo estimado por area</h3>
+        </div>
+        <span class="badge">Jornada base: 8 horas</span>
+      </div>
+      <div class="table-wrap process-time-table-wrap">
+        <table class="data-table process-time-table">
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Avance</th>
+              <th>Pendientes</th>
+              <th>Tiempo por ensamble</th>
+              <th>Horas pendientes</th>
+              <th>Dias de trabajo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${processStats.map((process) => renderProcessTimeRow(process, processTimes[process.id])).join("")}
+          </tbody>
+        </table>
+      </div>
+      <p class="process-time-note">Calculo: pendientes x tiempo por ensamble. Los dias se redondean hacia arriba usando jornadas de 8 horas.</p>
+      ${renderStructuralTimeDetail()}
+    </div>
+  `;
+}
+
+function renderStructuralTimeDetail() {
+  return `
+    <details class="structural-time-detail" open>
+      <summary>
+        <span>Validacion de tiempo estructural</span>
+        <strong>${STRUCTURAL_ACTIVITY_TIMES.length} actividades · ${formatClockMinutes(STRUCTURAL_TOTAL_MINUTES)} por estructura</strong>
+      </summary>
+      <div class="table-wrap structural-time-table-wrap">
+        <table class="data-table structural-time-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Actividad</th>
+              <th>Tiempo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${STRUCTURAL_ACTIVITY_TIMES.map((activity, index) => `
+              <tr>
+                <td class="mono">${index + 1}</td>
+                <td>${escapeHtml(activity.name)}</td>
+                <td class="mono">${formatClockMinutes(activity.minutes)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Tiempo total por estructura</strong></td>
+              <td class="mono"><strong>${formatClockMinutes(STRUCTURAL_TOTAL_MINUTES)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </details>
+  `;
+}
+
+function renderProcessTimeRow(process, time) {
+  const pending = Math.max(Number(process.total || 0) - Number(process.done || 0), 0);
+  const validTime = Boolean(time?.valid && Number.isFinite(time.minutes));
+  const pendingMinutes = validTime ? pending * time.minutes : Number.NaN;
+  const workDays = validTime ? Math.ceil(pendingMinutes / (8 * 60)) : Number.NaN;
+  const timeLabel = validTime
+    ? formatClockMinutes(time.minutes)
+    : `<span class="time-source-error">Dato por revisar${time?.raw ? ` (${escapeHtml(time.raw)})` : ""}</span>`;
+
+  return `
+    <tr class="${process.id === "estructurales" ? "process-time-highlight" : ""}">
+      <td><strong>${escapeHtml(process.name)}</strong></td>
+      <td class="mono">${process.done} / ${process.total}</td>
+      <td class="mono">${pending}</td>
+      <td class="mono">${timeLabel}</td>
+      <td class="mono">${validTime ? formatWorkDuration(pendingMinutes) : "-"}</td>
+      <td><strong>${validTime ? `${workDays.toLocaleString("es-MX")} dias` : "-"}</strong></td>
+    </tr>
+  `;
+}
+
+function formatClockMinutes(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.round(minutes % 60);
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function formatWorkDuration(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.round(minutes % 60);
+  return `${hours.toLocaleString("es-MX")} h ${String(remainder).padStart(2, "0")} min`;
 }
 
 function renderProcessBarRow(process) {
@@ -2970,11 +3455,12 @@ function parseMcMaterialesRows(rows) {
 function parseMcProcessRows(rows, process) {
   const progress = {};
   const activities = {};
+  const activityDefinitions = [];
   const delivered = {};
-  if (!process || !rows.length) return { progress, activities, delivered };
+  if (!process || !rows.length) return { progress, activities, activityDefinitions, delivered };
 
-  const firstDataIndex = rows.findIndex((row) => findEquipmentColumn(row) >= 0);
-  if (firstDataIndex < 0) return { progress, activities, delivered };
+  const firstDataIndex = findProcessDataStartIndex(rows);
+  if (firstDataIndex < 0) return { progress, activities, activityDefinitions, delivered };
 
   const headerIndex = findActivityHeaderIndex(rows, firstDataIndex);
   const headerRow = rows[headerIndex] || [];
@@ -2986,12 +3472,26 @@ function parseMcProcessRows(rows, process) {
   const maxColumns = Math.max(headerRow.length, groupRow.length, ...dataRows.map((row) => row.length));
 
   for (let col = activityStart; col < maxColumns; col += 1) {
+    if (col === deliveredColumn) continue;
     const label = headerRow[col] || groupRow[col] || "";
     const hasActivityValue = dataRows.some((row) => isActivityCellValue(row[col]));
     if (isActivityHeaderLabel(label) || hasActivityValue) {
       activityColumns.push({ col, label: label || `Actividad ${activityColumns.length + 1}` });
     }
   }
+
+  const scopedActivityColumns = getProcessActivityColumns(process.id, activityColumns);
+  const timeRow = findProcessTimeRow(rows.slice(0, firstDataIndex), scopedActivityColumns);
+
+  scopedActivityColumns.forEach(({ col, label }, index) => {
+    const driveMinutes = parseDriveDurationMinutes(timeRow[col]);
+    activityDefinitions.push({
+      id: `${process.id}-${index + 1}`,
+      name: label,
+      subprocess: groupRow[col] || process.name,
+      minutes: getValidatedActivityMinutes(process.id, label, driveMinutes, index),
+    });
+  });
 
   dataRows.forEach((row) => {
     const equipoCol = findEquipmentColumn(row);
@@ -3001,30 +3501,61 @@ function parseMcProcessRows(rows, process) {
 
     let done = 0;
     let corrections = 0;
-    const rowActivities = activityColumns.map(({ col, label }, index) => {
+    const rowActivities = scopedActivityColumns.map(({ col, label }, index) => {
       const stateName = activityState(row[col]);
       if (stateName === "hecho") done += 1;
       if (stateName === "correccion") corrections += 1;
       return {
         id: `${process.id}-${index + 1}`,
         name: label,
-        subprocess: process.name,
+        subprocess: groupRow[col] || process.name,
         state: stateName,
-        minutes: 15 + (index % 7) * 5,
+        minutes: activityDefinitions[index]?.minutes,
       };
     });
 
     progress[equipoId] = progress[equipoId] || {};
     progress[equipoId][process.id] = {
       done,
-      total: activityColumns.length || process.activities,
+      total: scopedActivityColumns.length || process.activities,
       corrections,
       updatedAt: new Date().toISOString(),
     };
     activities[`${equipoId}:${process.id}`] = rowActivities;
   });
 
-  return { progress, activities, delivered };
+  return { progress, activities, activityDefinitions, delivered };
+}
+
+function findProcessDataStartIndex(rows) {
+  for (let index = 0; index < rows.length; index += 1) {
+    if (findEquipmentColumn(rows[index]) < 0) continue;
+    const nearbyEquipmentRows = rows
+      .slice(index, index + 4)
+      .filter((row) => findEquipmentColumn(row) >= 0).length;
+    if (nearbyEquipmentRows >= 2) return index;
+  }
+  return rows.findIndex((row) => findEquipmentColumn(row) >= 0);
+}
+
+function getProcessActivityColumns(processId, columns) {
+  if (processId === "acabado_inicial") return columns.slice(0, 35);
+  if (processId === "pintura_detalles") return columns.slice(35, 47);
+  if (processId === "acabado_final") return columns.slice(47, 63);
+  return columns;
+}
+
+function findProcessTimeRow(candidateRows, activityColumns) {
+  let best = { row: [], score: 0 };
+  candidateRows.forEach((row) => {
+    const named = row.some((value) => normalizeKey(value).includes("tiempo_por_ensamble"));
+    const durations = activityColumns.reduce((count, { col }) => (
+      Number.isFinite(parseDriveDurationMinutes(row[col])) ? count + 1 : count
+    ), 0);
+    const score = durations + (named ? activityColumns.length + 1 : 0);
+    if (score > best.score) best = { row, score };
+  });
+  return best.row;
 }
 
 function findDeliveredColumn(...headerRows) {
@@ -3087,6 +3618,7 @@ function isActivityHeaderLabel(value) {
   if (/^\d+([.,:]\d+)*$/.test(raw)) return false;
   const text = normalizeText(value);
   if (!text || text.length < 3) return false;
+  if (text.includes("consecutivo")) return false;
   if (/^\d+([\.:]\d+)*$/.test(text) || text.includes("0:")) return false;
   const exactBlocked = [
     "almacen", "avance", "cantidad", "chasis", "consecutivo", "control", "division",
