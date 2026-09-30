@@ -2185,7 +2185,12 @@ function getSummary(data) {
     corrections += totals.corrections;
   });
 
-  const fixedTotal = Number(data.meta?.equipos) || equipos.length || 170;
+  const vinTotal = new Set(
+    equipos
+      .map((equipo) => matchKey(equipo.vin))
+      .filter(Boolean)
+  ).size;
+  const fixedTotal = vinTotal || equipos.length || Number(data.meta?.equipos) || 170;
   const finishedIds = new Set(
     equipos
       .filter((equipo) => progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
