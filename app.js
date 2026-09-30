@@ -83,6 +83,9 @@ const STRUCTURAL_ACTIVITY_TIMES = [
 ];
 const STRUCTURAL_TOTAL_MINUTES = STRUCTURAL_ACTIVITY_TIMES.reduce((sum, activity) => sum + activity.minutes, 0);
 const STORAGE_KEY = "tablero-ensambles-config-v1";
+const DATA_CACHE_DB_NAME = "tablero-ensambles-cache-v1";
+const DATA_CACHE_STORE = "datasets";
+const DATA_CACHE_KEY = "latest-drive-data";
 const app = document.getElementById("app");
 let autoRefreshTimer = null;
 
@@ -195,6 +198,7 @@ app.addEventListener("click", (event) => {
     state.config = createEmptyConfig();
     saveConfig(state.config);
     localStorage.removeItem(STORAGE_KEY);
+    clearCachedDataset();
     state.data = createEmptyDataset();
     state.selectedId = null;
     state.financeVisibleColumns = [];
@@ -291,7 +295,20 @@ app.addEventListener("change", (event) => {
 });
 
 async function bootstrapData() {
-  const publicConfig = await loadPublicSourceConfig();
+  const [publicConfig, cachedRecord] = await Promise.all([
+    loadPublicSourceConfig(),
+    loadCachedDataset(),
+  ]);
+
+  const hasCachedData = Boolean(cachedRecord?.data?.equipos?.length);
+
+  if (hasCachedData) {
+    state.data = normalizeDataset(cachedRecord.data);
+    state.selectedId = state.data.equipos[0]?.id || null;
+    state.toast = "Mostrando la ultima informacion guardada.";
+    render();
+  }
+
   if (publicConfig) {
     state.config = mergeSourceConfigs(publicConfig, state.config);
   }
@@ -299,7 +316,22 @@ async function bootstrapData() {
   await loadBundledAdvanceData();
 
   if (hasConfiguredSources(state.config)) {
-    await loadDriveData({ keepView: true, mergeWithCurrent: true });
+    const cacheIsFresh = hasCachedData && isCachedDatasetFresh(
+      cachedRecord,
+      state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES,
+      state.config,
+    );
+
+    if (cacheIsFresh) {
+      state.toast = "Informacion guardada al dia. Drive se actualizara automaticamente.";
+      render();
+    } else {
+      await loadDriveData({
+        background: hasCachedData,
+        keepView: true,
+        mergeWithCurrent: true,
+      });
+    }
     startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
     return;
   }
@@ -318,6 +350,7 @@ async function loadDriveData(options = {}) {
   try {
     const imported = await buildDatasetFromConfig(state.config, mergeWithCurrent ? state.data : createEmptyDataset());
     state.data = imported;
+    await saveCachedDataset(imported, state.config);
     state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
       ? previousSelectedId
       : imported.equipos[0]?.id || null;
@@ -973,10 +1006,7 @@ function renderHorasView() {
           ${missingTimeCount ? `<span class="badge warning">${missingTimeCount} sin tiempo</span>` : ""}
         </div>
       </div>
-      <div class="hours-summary-bars">
-        ${renderHoursBar("Horas hechas", totalDoneMinutes, totalHoursMinutes, "done")}
-        ${renderHoursBar("Horas por hacer", totalPendingMinutes, totalHoursMinutes, "pending")}
-      </div>
+      ${renderHoursGauge(totalDoneMinutes, totalPendingMinutes, `${process.name}: avance de horas`)}
     </section>
 
     <section class="panel" style="margin-top: 14px;">
@@ -988,7 +1018,7 @@ function renderHorasView() {
       </div>
       ${rows.length ? `
         <div class="hours-activity-list">
-          ${rows.map((item) => renderHoursActivityBars(item)).join("")}
+          ${rows.map((item) => renderHoursActivityGauge(item)).join("")}
         </div>
       ` : `<div class="empty-state">No hay actividades detalladas para esta area. Conecta su pestaña de Drive para calcular las horas por VIN.</div>`}
     </section>
@@ -1067,7 +1097,7 @@ function activityNameKey(value) {
     .trim();
 }
 
-function renderHoursActivityBars(item) {
+function renderHoursActivityGauge(item) {
   const selectedLabel = {
     hecho: "Hecha",
     pendiente: "Pendiente",
@@ -1075,8 +1105,6 @@ function renderHoursActivityBars(item) {
     sin_dato: "Sin dato",
   }[item.selectedState] || "Sin dato";
   const selectedClass = item.selectedState === "hecho" ? "terminado" : item.selectedState === "correccion" ? "correccion" : "pendiente";
-  const totalMinutes = item.doneMinutes + item.pendingMinutes;
-
   return `
     <article class="hours-activity-item">
       <div class="hours-activity-heading">
@@ -1087,23 +1115,41 @@ function renderHoursActivityBars(item) {
         <span class="status ${selectedClass}">VIN: ${selectedLabel}</span>
       </div>
       ${item.timeValid ? `
-        <div class="hours-activity-bars">
-          ${renderHoursBar("Horas hechas", item.doneMinutes, totalMinutes, "done")}
-          ${renderHoursBar("Horas por hacer", item.pendingMinutes, totalMinutes, "pending")}
-        </div>
+        ${renderHoursGauge(item.doneMinutes, item.pendingMinutes, `${item.name}: avance de horas`, true)}
       ` : `<p class="hours-missing-time">No se incluye en los totales hasta que Drive tenga un tiempo válido.</p>`}
     </article>
   `;
 }
 
-function renderHoursBar(label, minutes, totalMinutes, kind) {
-  const percent = totalMinutes > 0 ? clamp((minutes / totalMinutes) * 100, 0, 100) : 0;
+function renderHoursGauge(doneMinutes, pendingMinutes, label, compact = false) {
+  const totalMinutes = doneMinutes + pendingMinutes;
+  const percent = totalMinutes > 0 ? clamp((doneMinutes / totalMinutes) * 100, 0, 100) : 0;
   return `
-    <div class="hours-bar-row ${kind}">
-      <span class="hours-bar-label">${label}</span>
-      <div class="hours-bar-track"><div class="hours-bar-fill" style="--hours-value:${percent}%;"></div></div>
-      <strong class="hours-bar-percent">${Math.round(percent)}%</strong>
-      <span class="hours-bar-value mono">${formatWorkDuration(minutes)}</span>
+    <div class="hours-gauge-layout ${compact ? "compact" : ""}">
+      <div class="assembly-gauge hours-gauge" role="img" aria-label="${escapeAttr(`${label}: ${formatWorkDuration(doneMinutes)} hechas y ${formatWorkDuration(pendingMinutes)} pendientes`)}">
+        <svg viewBox="0 0 120 66" aria-hidden="true">
+          <path class="assembly-gauge-track" pathLength="100" d="M10 58 A50 50 0 0 1 110 58"></path>
+          <path class="assembly-gauge-value" pathLength="100" stroke-dasharray="${percent} 100" d="M10 58 A50 50 0 0 1 110 58"></path>
+        </svg>
+        <div class="assembly-gauge-reading">
+          <strong>${Math.round(percent)}%</strong>
+          <span>hecho</span>
+        </div>
+      </div>
+      <div class="assembly-time-breakdown hours-gauge-breakdown">
+        <div class="assembly-time-line worked">
+          <span><i></i>Horas hechas</span>
+          <strong class="mono">${formatWorkDuration(doneMinutes)}</strong>
+        </div>
+        <div class="assembly-time-line pending">
+          <span><i></i>Horas por hacer</span>
+          <strong class="mono">${formatWorkDuration(pendingMinutes)}</strong>
+        </div>
+        <div class="assembly-time-total">
+          <span>Total estimado</span>
+          <strong class="mono">${formatWorkDuration(totalMinutes)}</strong>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -3891,6 +3937,101 @@ function loadConfig() {
 
 function saveConfig(config) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
+
+function openDataCacheDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB no disponible"));
+      return;
+    }
+
+    const request = indexedDB.open(DATA_CACHE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(DATA_CACHE_STORE)) {
+        database.createObjectStore(DATA_CACHE_STORE, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("No se pudo abrir la cache"));
+    request.onblocked = () => reject(new Error("La cache esta bloqueada por otra pestaña"));
+  });
+}
+
+async function loadCachedDataset() {
+  try {
+    const database = await openDataCacheDatabase();
+    const record = await new Promise((resolve, reject) => {
+      const transaction = database.transaction(DATA_CACHE_STORE, "readonly");
+      const request = transaction.objectStore(DATA_CACHE_STORE).get(DATA_CACHE_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error("No se pudo leer la cache"));
+    });
+    database.close();
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+function getSourceConfigSignature(config) {
+  return JSON.stringify({
+    workbook: String(config?.workbook || "").trim(),
+    equipos: String(config?.equipos || "").trim(),
+    avance: String(config?.avance || "").trim(),
+    materiales: String(config?.materiales || "").trim(),
+    finanzas: String(config?.finanzas || "").trim(),
+    processSheets: PROCESS_DEFS.map((process) => [
+      process.id,
+      String(config?.processSheets?.[process.id] || "").trim(),
+    ]),
+  });
+}
+
+function isCachedDatasetFresh(record, minutes, config) {
+  const savedAt = Date.parse(record?.savedAt || "");
+  if (!Number.isFinite(savedAt)) return false;
+  if (record?.sourceSignature !== getSourceConfigSignature(config)) return false;
+  const maxAge = Math.max(1, Number(minutes) || DEFAULT_AUTO_REFRESH_MINUTES) * 60 * 1000;
+  return Date.now() - savedAt < maxAge;
+}
+
+async function saveCachedDataset(data, config) {
+  try {
+    const database = await openDataCacheDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(DATA_CACHE_STORE, "readwrite");
+      transaction.objectStore(DATA_CACHE_STORE).put({
+        key: DATA_CACHE_KEY,
+        savedAt: new Date().toISOString(),
+        sourceSignature: getSourceConfigSignature(config),
+        data,
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("No se pudo guardar la cache"));
+      transaction.onabort = () => reject(transaction.error || new Error("Se cancelo el guardado de la cache"));
+    });
+    database.close();
+  } catch {
+    // El tablero puede seguir funcionando sin cache si el navegador la restringe.
+  }
+}
+
+async function clearCachedDataset() {
+  try {
+    const database = await openDataCacheDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(DATA_CACHE_STORE, "readwrite");
+      transaction.objectStore(DATA_CACHE_STORE).delete(DATA_CACHE_KEY);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error("No se pudo limpiar la cache"));
+      transaction.onabort = () => reject(transaction.error || new Error("Se cancelo la limpieza de la cache"));
+    });
+    database.close();
+  } catch {
+    // No bloquea el borrado del resto de los datos locales.
+  }
 }
 
 function readConfigFromDom() {
