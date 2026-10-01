@@ -610,6 +610,19 @@ button {
   background: linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
 }
 
+.assembly-time-link {
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.assembly-time-link:hover,
+.assembly-time-link:focus-visible {
+  border-color: rgba(31, 120, 184, 0.6);
+  box-shadow: 0 8px 20px rgba(13, 63, 102, 0.12);
+  transform: translateY(-2px);
+  outline: none;
+}
+
 .assembly-time-card-top {
   display: flex;
   justify-content: space-between;
@@ -809,6 +822,58 @@ button {
   gap: 8px;
 }
 
+.hours-summary-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hours-summary-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--mc-blue);
+  border-radius: 9px;
+  background: #fbfdff;
+}
+
+.hours-summary-card.unit {
+  border-top-color: #2aa96b;
+}
+
+.hours-summary-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hours-summary-card-heading h3 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+
+.hours-summary-card-heading p:not(.panel-label) {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.hours-summary-card .hours-gauge-layout.compact {
+  grid-template-columns: minmax(135px, 180px) minmax(190px, 1fr);
+  gap: 16px;
+}
+
+.hours-unit-empty {
+  min-height: 170px;
+}
+
+.hours-vin-state {
+  display: none;
+}
+
 .badge.warning {
   color: #92500f;
   border-color: rgba(240, 138, 36, 0.42);
@@ -882,6 +947,57 @@ button {
   font-size: 12px;
 }
 
+.hours-activity-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hours-activity-scope {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.hours-activity-scope.unit {
+  border-color: rgba(42, 169, 107, 0.3);
+  background: rgba(42, 169, 107, 0.035);
+}
+
+.hours-activity-scope-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hours-activity-scope-heading span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hours-activity-scope-heading strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.hours-activity-scope .hours-gauge-layout.compact {
+  grid-template-columns: minmax(125px, 165px) minmax(175px, 1fr);
+  gap: 14px;
+}
+
+.hours-activity-unit-empty {
+  min-height: 140px;
+}
+
 .hours-missing-time {
   margin: 0;
   padding: 10px 12px;
@@ -900,6 +1016,14 @@ button {
   .hours-gauge-layout.compact {
     grid-template-columns: minmax(140px, 190px) minmax(190px, 1fr);
     justify-content: center;
+  }
+
+  .hours-summary-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .hours-activity-comparison {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1028,6 +1152,19 @@ button {
 .process-bar-row {
   min-height: 32px;
   grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.5fr) 62px 84px;
+}
+
+.process-bar-link {
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+
+.process-bar-link:hover,
+.process-bar-link:focus-visible {
+  background: rgba(31, 120, 184, 0.07);
+  box-shadow: 0 0 0 5px rgba(31, 120, 184, 0.07);
+  outline: none;
 }
 
 .process-count-inline {

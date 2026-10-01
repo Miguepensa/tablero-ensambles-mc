@@ -132,6 +132,16 @@ app.addEventListener("click", (event) => {
     render();
   }
 
+  if (action === "open-hours-process") {
+    const process = PROCESS_DEFS.find((item) => item.id === target.dataset.process);
+    if (process) {
+      state.hoursProcess = process.id;
+      state.hoursActivityQuery = "";
+      state.view = "horas";
+      render();
+    }
+  }
+
   if (action === "select-equipo") {
     state.selectedId = target.dataset.id;
     state.view = "detalle";
@@ -265,6 +275,13 @@ app.addEventListener("input", (event) => {
     state.hoursActivityQuery = target.value;
     render();
   }
+});
+
+app.addEventListener("keydown", (event) => {
+  if (!event.target.matches('[data-action="open-hours-process"]')) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  event.target.click();
 });
 
 app.addEventListener("change", (event) => {
@@ -702,7 +719,7 @@ function renderDashboardAssemblyTimes(items) {
       <div class="assembly-time-grid">
         ${items.map((item) => renderAssemblyTimeGauge(item)).join("")}
       </div>
-      <p class="assembly-time-footnote">Azul: horas ya trabajadas. Gris: horas que faltan. Los cálculos usan los tiempos y avances registrados en Drive.</p>
+      <p class="assembly-time-footnote">Selecciona un ensamble para abrir su resumen general de todas las unidades. Azul: horas ya trabajadas. Gris: horas que faltan.</p>
     </section>
   `;
 }
@@ -715,7 +732,7 @@ function renderAssemblyTimeGauge(item) {
   const title = item.name;
 
   return `
-    <article class="assembly-time-card">
+    <article class="assembly-time-card assembly-time-link" data-action="open-hours-process" data-process="${escapeAttr(item.id)}" role="button" tabindex="0" aria-label="Abrir resumen general de ${escapeAttr(title)}">
       <div class="assembly-time-card-top">
         <div>
           <p class="assembly-time-name">${escapeHtml(title)}</p>
@@ -966,6 +983,8 @@ function renderHorasView() {
   const totalDoneMinutes = allStats.reduce((sum, item) => sum + item.doneMinutes, 0);
   const totalPendingMinutes = allStats.reduce((sum, item) => sum + item.pendingMinutes, 0);
   const totalHoursMinutes = totalDoneMinutes + totalPendingMinutes;
+  const unitDoneMinutes = allStats.reduce((sum, item) => sum + (item.timeValid && item.selectedState === "hecho" ? item.minutes : 0), 0);
+  const unitPendingMinutes = allStats.reduce((sum, item) => sum + (item.timeValid && item.selectedState !== "hecho" ? item.minutes : 0), 0);
   const missingTimeCount = allStats.filter((item) => !item.timeValid).length;
 
   return `
@@ -1006,7 +1025,30 @@ function renderHorasView() {
           ${missingTimeCount ? `<span class="badge warning">${missingTimeCount} sin tiempo</span>` : ""}
         </div>
       </div>
-      ${renderHoursGauge(totalDoneMinutes, totalPendingMinutes, `${process.name}: avance de horas`)}
+      <div class="hours-summary-comparison">
+        <article class="hours-summary-card">
+          <div class="hours-summary-card-heading">
+            <div>
+              <p class="panel-label">General</p>
+              <h3>Todas las unidades</h3>
+            </div>
+            <span class="badge">${state.data.equipos.length} unidades</span>
+          </div>
+          ${renderHoursGauge(totalDoneMinutes, totalPendingMinutes, `${process.name}: avance general de todas las unidades`, true)}
+        </article>
+        <article class="hours-summary-card unit">
+          <div class="hours-summary-card-heading">
+            <div>
+              <p class="panel-label">General por unidad</p>
+              <h3>${escapeHtml(selected?.control || "Sin unidad")}</h3>
+              <p>${escapeHtml(selected?.vin || "Selecciona un VIN")}</p>
+            </div>
+          </div>
+          ${selected
+            ? renderHoursGauge(unitDoneMinutes, unitPendingMinutes, `${process.name}: avance de la unidad ${selected.control || selected.vin}`, true)
+            : `<div class="empty-state hours-unit-empty">Selecciona una unidad para ver su resumen.</div>`}
+        </article>
+      </div>
     </section>
 
     <section class="panel" style="margin-top: 14px;">
@@ -1098,6 +1140,7 @@ function activityNameKey(value) {
 }
 
 function renderHoursActivityGauge(item) {
+  const selected = getSelectedEquipo();
   const selectedLabel = {
     hecho: "Hecha",
     pendiente: "Pendiente",
@@ -1105,6 +1148,8 @@ function renderHoursActivityGauge(item) {
     sin_dato: "Sin dato",
   }[item.selectedState] || "Sin dato";
   const selectedClass = item.selectedState === "hecho" ? "terminado" : item.selectedState === "correccion" ? "correccion" : "pendiente";
+  const unitDoneMinutes = item.timeValid && item.selectedState === "hecho" ? item.minutes : 0;
+  const unitPendingMinutes = item.timeValid && item.selectedState !== "hecho" ? item.minutes : 0;
   return `
     <article class="hours-activity-item">
       <div class="hours-activity-heading">
@@ -1112,10 +1157,27 @@ function renderHoursActivityGauge(item) {
           <h3>${escapeHtml(item.name)}</h3>
           <p>${item.timeValid ? `${formatClockMinutes(item.minutes)} por unidad` : "Tiempo sin definir en Drive"}</p>
         </div>
-        <span class="status ${selectedClass}">VIN: ${selectedLabel}</span>
+        <span class="status ${selectedClass} hours-vin-state" aria-hidden="true">VIN: ${selectedLabel}</span>
       </div>
       ${item.timeValid ? `
-        ${renderHoursGauge(item.doneMinutes, item.pendingMinutes, `${item.name}: avance de horas`, true)}
+        <div class="hours-activity-comparison">
+          <section class="hours-activity-scope">
+            <div class="hours-activity-scope-heading">
+              <span>General</span>
+              <strong>${state.data.equipos.length} unidades</strong>
+            </div>
+            ${renderHoursGauge(item.doneMinutes, item.pendingMinutes, `${item.name}: avance general de todas las unidades`, true)}
+          </section>
+          <section class="hours-activity-scope unit">
+            <div class="hours-activity-scope-heading">
+              <span>Por unidad</span>
+              <strong>${escapeHtml(selected?.control || selected?.vin || "Sin unidad")}</strong>
+            </div>
+            ${selected
+              ? renderHoursGauge(unitDoneMinutes, unitPendingMinutes, `${item.name}: avance de la unidad ${selected.control || selected.vin}`, true)
+              : `<div class="empty-state hours-activity-unit-empty">Selecciona una unidad.</div>`}
+          </section>
+        </div>
       ` : `<p class="hours-missing-time">No se incluye en los totales hasta que Drive tenga un tiempo válido.</p>`}
     </article>
   `;
@@ -1557,14 +1619,20 @@ async function buildDatasetFromConfig(config, baseData = createEmptyDataset()) {
 
 async function fetchCsv(inputUrl) {
   const url = normalizeGoogleCsvUrl(inputUrl);
+  const requestUrl = isGoogleSheetsUrl(url) ? appendCacheBuster(url) : url;
   try {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetch(requestUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status} en ${url}`);
     return await response.text();
   } catch (error) {
     if (isGoogleSheetsUrl(inputUrl)) return fetchGoogleSheetCsvViaJsonp(inputUrl);
     throw error;
   }
+}
+
+function appendCacheBuster(inputUrl) {
+  const separator = String(inputUrl).includes("?") ? "&" : "?";
+  return `${inputUrl}${separator}_tablero=${Date.now()}`;
 }
 
 function applyCsvToDataset(data, kind, text) {
@@ -2845,7 +2913,7 @@ function formatWorkDuration(minutes) {
 
 function renderProcessBarRow(process) {
   return `
-    <div class="bar-row process-bar-row">
+    <div class="bar-row process-bar-row process-bar-link" data-action="open-hours-process" data-process="${escapeAttr(process.id)}" role="button" tabindex="0" aria-label="Abrir resumen general de ${escapeAttr(process.name)}">
       <span class="bar-label" title="${escapeAttr(process.name)}">${escapeHtml(process.name)}</span>
       <div class="bar-track"><div class="bar-fill" style="--value:${clamp(process.percent, 0, 100)}%; --bar-color:${process.color};"></div></div>
       <span class="bar-value">${formatPercent(process.percent)}</span>
