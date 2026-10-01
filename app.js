@@ -17,8 +17,8 @@ const VIEWS = [
   { id: "equipos", label: "Equipos", icon: "E" },
   { id: "detalle", label: "Detalle", icon: "U" },
   { id: "captura", label: "Captura", icon: "C" },
-  { id: "horas", label: "Horas", icon: "H" },
-  { id: "materiales", label: "Materiales", icon: "M" },
+  { id: "horas_general", label: "Horas general", icon: "G" },
+  { id: "horas", label: "Horas por VIN", icon: "H" },
   { id: "finanzas", label: "Finanzas", icon: "F" },
   { id: "config", label: "Conexion", icon: "X" },
 ];
@@ -137,7 +137,7 @@ app.addEventListener("click", (event) => {
     if (process) {
       state.hoursProcess = process.id;
       state.hoursActivityQuery = "";
-      state.view = "horas";
+      state.view = "horas_general";
       render();
     }
   }
@@ -600,8 +600,8 @@ function renderKicker(view) {
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
     detalle: "Avance por proceso, cobertura de actividades y datos principales de la unidad.",
     captura: "Registro rapido de actividades por proceso para la unidad seleccionada.",
-    horas: "Horas realizadas y pendientes calculadas por actividad, con consulta por VIN.",
-    materiales: "Inventario, requisiciones, entregas, faltantes y cobertura por material.",
+    horas_general: "Horas realizadas y pendientes acumuladas para todas las unidades.",
+    horas: "Horas realizadas y pendientes de la unidad seleccionada por VIN.",
     finanzas: `${(state.data.finanzas || []).length} registros financieros vinculados por VIN, almacen y zona. Fuente: ${escapeHtml(state.data.financeSource || "Excel local")}.`,
     config: "URLs CSV publicadas desde Drive y carga manual de archivos CSV.",
   };
@@ -612,8 +612,8 @@ function renderCurrentView() {
   if (state.view === "equipos") return renderEquiposView();
   if (state.view === "detalle") return renderDetalleView();
   if (state.view === "captura") return renderCapturaView();
+  if (state.view === "horas_general") return renderHorasGeneralView();
   if (state.view === "horas") return renderHorasView();
-  if (state.view === "materiales") return renderMaterialesView();
   if (state.view === "finanzas") return renderFinanzasView();
   if (state.view === "config") return renderConfigView();
   return renderDashboardView();
@@ -972,6 +972,68 @@ function renderCapturaView() {
   `;
 }
 
+function renderHorasGeneralView() {
+  const process = PROCESS_DEFS.find((item) => item.id === state.hoursProcess) || PROCESS_DEFS[0];
+  const allStats = getHoursActivityStats(process);
+  const activityQuery = normalizeText(state.hoursActivityQuery);
+  const rows = activityQuery
+    ? allStats.filter((item) => normalizeText(`${item.name} ${item.subprocess}`).includes(activityQuery))
+    : allStats;
+  const totalDoneMinutes = allStats.reduce((sum, item) => sum + item.doneMinutes, 0);
+  const totalPendingMinutes = allStats.reduce((sum, item) => sum + item.pendingMinutes, 0);
+  const minutesPerAssembly = allStats.filter((item) => item.timeValid).reduce((sum, item) => sum + item.minutes, 0);
+  const missingTimeCount = allStats.filter((item) => !item.timeValid).length;
+
+  return `
+    <section class="panel hours-control-panel">
+      <div class="hours-filters hours-general-filters">
+        <label class="field">
+          <span class="field-label">Area</span>
+          <select class="select" data-hours-process>
+            ${PROCESS_DEFS.map((item) => {
+              const available = getHoursDefinitions(item).length > 0;
+              return `<option value="${item.id}" ${item.id === process.id ? "selected" : ""} ${available ? "" : "disabled"}>${escapeHtml(item.name)}${available ? "" : " (sin datos)"}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Buscar actividad</span>
+          <input class="input" data-hours-activity-query value="${escapeAttr(state.hoursActivityQuery)}" placeholder="Ej. barrenado, chasis..." />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel hours-summary-panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Resumen de horas</p>
+          <h2 class="panel-title">${escapeHtml(process.name)}</h2>
+        </div>
+        <div class="hours-summary-badges">
+          <span class="badge hours-per-assembly-badge">Tiempo por ensamble <strong class="mono">${formatClockMinutes(minutesPerAssembly)}</strong></span>
+          <span class="badge">${rows.length} actividades</span>
+          ${missingTimeCount ? `<span class="badge warning">${missingTimeCount} sin tiempo</span>` : ""}
+        </div>
+      </div>
+      ${renderHoursGauge(totalDoneMinutes, totalPendingMinutes, `${process.name}: avance general de todas las unidades`)}
+    </section>
+
+    <section class="panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Actividades</p>
+          <h2 class="panel-title">Horas generales por actividad</h2>
+        </div>
+      </div>
+      ${rows.length ? `
+        <div class="hours-activity-list">
+          ${rows.map((item) => renderHoursActivityGauge(item, "general")).join("")}
+        </div>
+      ` : `<div class="empty-state">No hay actividades detalladas para esta area.</div>`}
+    </section>
+  `;
+}
+
 function renderHorasView() {
   const process = PROCESS_DEFS.find((item) => item.id === state.hoursProcess) || PROCESS_DEFS[0];
   const selected = getSelectedEquipo();
@@ -980,11 +1042,9 @@ function renderHorasView() {
   const rows = activityQuery
     ? allStats.filter((item) => normalizeText(`${item.name} ${item.subprocess}`).includes(activityQuery))
     : allStats;
-  const totalDoneMinutes = allStats.reduce((sum, item) => sum + item.doneMinutes, 0);
-  const totalPendingMinutes = allStats.reduce((sum, item) => sum + item.pendingMinutes, 0);
-  const totalHoursMinutes = totalDoneMinutes + totalPendingMinutes;
   const unitDoneMinutes = allStats.reduce((sum, item) => sum + (item.timeValid && item.selectedState === "hecho" ? item.minutes : 0), 0);
   const unitPendingMinutes = allStats.reduce((sum, item) => sum + (item.timeValid && item.selectedState !== "hecho" ? item.minutes : 0), 0);
+  const minutesPerAssembly = allStats.filter((item) => item.timeValid).reduce((sum, item) => sum + item.minutes, 0);
   const missingTimeCount = allStats.filter((item) => !item.timeValid).length;
 
   return `
@@ -1017,52 +1077,32 @@ function renderHorasView() {
     <section class="panel hours-summary-panel" style="margin-top: 14px;">
       <div class="panel-header">
         <div>
-          <p class="panel-label">Resumen de horas</p>
-          <h2 class="panel-title">${escapeHtml(process.name)}</h2>
+          <p class="panel-label">Resumen por unidad</p>
+          <h2 class="panel-title">${escapeHtml(process.name)} · ${escapeHtml(selected?.control || "Sin unidad")}</h2>
         </div>
         <div class="hours-summary-badges">
+          <span class="badge hours-per-assembly-badge">Tiempo por ensamble <strong class="mono">${formatClockMinutes(minutesPerAssembly)}</strong></span>
           <span class="badge">${rows.length} actividades</span>
           ${missingTimeCount ? `<span class="badge warning">${missingTimeCount} sin tiempo</span>` : ""}
         </div>
       </div>
-      <div class="hours-summary-comparison">
-        <article class="hours-summary-card">
-          <div class="hours-summary-card-heading">
-            <div>
-              <p class="panel-label">General</p>
-              <h3>Todas las unidades</h3>
-            </div>
-            <span class="badge">${state.data.equipos.length} unidades</span>
-          </div>
-          ${renderHoursGauge(totalDoneMinutes, totalPendingMinutes, `${process.name}: avance general de todas las unidades`, true)}
-        </article>
-        <article class="hours-summary-card unit">
-          <div class="hours-summary-card-heading">
-            <div>
-              <p class="panel-label">General por unidad</p>
-              <h3>${escapeHtml(selected?.control || "Sin unidad")}</h3>
-              <p>${escapeHtml(selected?.vin || "Selecciona un VIN")}</p>
-            </div>
-          </div>
-          ${selected
-            ? renderHoursGauge(unitDoneMinutes, unitPendingMinutes, `${process.name}: avance de la unidad ${selected.control || selected.vin}`, true)
-            : `<div class="empty-state hours-unit-empty">Selecciona una unidad para ver su resumen.</div>`}
-        </article>
-      </div>
+      ${selected
+        ? renderHoursGauge(unitDoneMinutes, unitPendingMinutes, `${process.name}: avance de la unidad ${selected.control || selected.vin}`)
+        : `<div class="empty-state hours-unit-empty">Selecciona una unidad para ver su resumen.</div>`}
     </section>
 
     <section class="panel" style="margin-top: 14px;">
       <div class="panel-header">
         <div>
-          <p class="panel-label">Actividades</p>
-          <h2 class="panel-title">Horas hechas y por hacer</h2>
+          <p class="panel-label">Actividades por unidad</p>
+          <h2 class="panel-title">Horas del VIN seleccionado</h2>
         </div>
       </div>
       ${rows.length ? `
         <div class="hours-activity-list">
-          ${rows.map((item) => renderHoursActivityGauge(item)).join("")}
+          ${rows.map((item) => renderHoursActivityGauge(item, "unit")).join("")}
         </div>
-      ` : `<div class="empty-state">No hay actividades detalladas para esta area. Conecta su pestaña de Drive para calcular las horas por VIN.</div>`}
+      ` : `<div class="empty-state">No hay actividades detalladas para esta area.</div>`}
     </section>
   `;
 }
@@ -1139,7 +1179,7 @@ function activityNameKey(value) {
     .trim();
 }
 
-function renderHoursActivityGauge(item) {
+function renderHoursActivityGauge(item, scope = "general") {
   const selected = getSelectedEquipo();
   const selectedLabel = {
     hecho: "Hecha",
@@ -1148,8 +1188,16 @@ function renderHoursActivityGauge(item) {
     sin_dato: "Sin dato",
   }[item.selectedState] || "Sin dato";
   const selectedClass = item.selectedState === "hecho" ? "terminado" : item.selectedState === "correccion" ? "correccion" : "pendiente";
-  const unitDoneMinutes = item.timeValid && item.selectedState === "hecho" ? item.minutes : 0;
-  const unitPendingMinutes = item.timeValid && item.selectedState !== "hecho" ? item.minutes : 0;
+  const isUnitView = scope === "unit";
+  const doneMinutes = isUnitView
+    ? (item.timeValid && item.selectedState === "hecho" ? item.minutes : 0)
+    : item.doneMinutes;
+  const pendingMinutes = isUnitView
+    ? (item.timeValid && item.selectedState !== "hecho" ? item.minutes : 0)
+    : item.pendingMinutes;
+  const scopeLabel = isUnitView
+    ? (selected?.control || selected?.vin || "Sin unidad")
+    : `${state.data.equipos.length} unidades`;
   return `
     <article class="hours-activity-item">
       <div class="hours-activity-heading">
@@ -1157,27 +1205,20 @@ function renderHoursActivityGauge(item) {
           <h3>${escapeHtml(item.name)}</h3>
           <p>${item.timeValid ? `${formatClockMinutes(item.minutes)} por unidad` : "Tiempo sin definir en Drive"}</p>
         </div>
+        <span class="badge hours-activity-scope-label">${escapeHtml(scopeLabel)}</span>
         <span class="status ${selectedClass} hours-vin-state" aria-hidden="true">VIN: ${selectedLabel}</span>
       </div>
       ${item.timeValid ? `
-        <div class="hours-activity-comparison">
-          <section class="hours-activity-scope">
-            <div class="hours-activity-scope-heading">
-              <span>General</span>
-              <strong>${state.data.equipos.length} unidades</strong>
-            </div>
-            ${renderHoursGauge(item.doneMinutes, item.pendingMinutes, `${item.name}: avance general de todas las unidades`, true)}
-          </section>
-          <section class="hours-activity-scope unit">
-            <div class="hours-activity-scope-heading">
-              <span>Por unidad</span>
-              <strong>${escapeHtml(selected?.control || selected?.vin || "Sin unidad")}</strong>
-            </div>
-            ${selected
-              ? renderHoursGauge(unitDoneMinutes, unitPendingMinutes, `${item.name}: avance de la unidad ${selected.control || selected.vin}`, true)
-              : `<div class="empty-state hours-activity-unit-empty">Selecciona una unidad.</div>`}
-          </section>
-        </div>
+        ${isUnitView && !selected
+          ? `<div class="empty-state hours-activity-unit-empty">Selecciona una unidad.</div>`
+          : renderHoursGauge(
+              doneMinutes,
+              pendingMinutes,
+              isUnitView
+                ? `${item.name}: avance de la unidad ${selected?.control || selected?.vin || "sin unidad"}`
+                : `${item.name}: avance general de todas las unidades`,
+              true,
+            )}
       ` : `<p class="hours-missing-time">No se incluye en los totales hasta que Drive tenga un tiempo válido.</p>`}
     </article>
   `;

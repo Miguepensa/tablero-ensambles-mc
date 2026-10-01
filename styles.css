@@ -587,6 +587,10 @@ button {
   gap: 14px;
 }
 
+.hours-general-filters {
+  grid-template-columns: minmax(180px, 0.6fr) minmax(240px, 1fr);
+}
+
 .assembly-time-panel {
   overflow: hidden;
 }
@@ -822,6 +826,16 @@ button {
   gap: 8px;
 }
 
+.hours-per-assembly-badge {
+  background: var(--blue-soft);
+  border-color: #b8d9f1;
+}
+
+.hours-per-assembly-badge strong {
+  margin-left: 5px;
+  color: var(--mc-blue);
+}
+
 .hours-summary-comparison {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -945,6 +959,11 @@ button {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.hours-activity-scope-label {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .hours-activity-comparison {
