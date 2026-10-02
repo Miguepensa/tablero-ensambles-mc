@@ -34,6 +34,7 @@ const STATUS = {
 const SOURCE_FIELDS = [
   { key: "equipos", label: "LISTA EQUIPOS / lista de chasis", sheets: ["LISTA EQUIPOS", "LISTA DE CHASIS", "lista de chasis"] },
   { key: "avance", label: "% POR UNIDAD / AVANCE GENERAL", sheets: ["% POR UNIDAD", "AVANCE GENERAL", "% POR UNIDAD / AVANCE GENERAL"] },
+  { key: "planning", label: "Planeacion de ensambles", sheets: ["PLANEACION_ENSAMBLES"] },
   { key: "materiales", label: "Materiales", sheets: ["MATERIALES", "Materiales"] },
   { key: "finanzas", label: "Finanzas / Copia de Hoja 1", sheets: ["Copia de Hoja 1", "FINANZAS", "Finanzas"] },
 ];
@@ -400,6 +401,7 @@ function normalizeSourceConfig(config) {
   clean.workbook = String(config.workbook || "").trim();
   clean.equipos = String(config.equipos || "").trim();
   clean.avance = String(config.avance || "").trim();
+  clean.planning = String(config.planning || "").trim();
   clean.materiales = String(config.materiales || "").trim();
   clean.finanzas = String(config.finanzas || "").trim();
   clean.autoRefreshMinutes = Number(config.autoRefreshMinutes) || DEFAULT_AUTO_REFRESH_MINUTES;
@@ -414,7 +416,7 @@ function mergeSourceConfigs(...configs) {
   const merged = createEmptyConfig();
   configs.forEach((config) => {
     if (!config) return;
-    ["workbook", "equipos", "avance", "materiales", "finanzas"].forEach((key) => {
+    ["workbook", "equipos", "avance", "planning", "materiales", "finanzas"].forEach((key) => {
       if (isUsableSourceUrl(config[key])) merged[key] = config[key];
     });
     if (Number(config.autoRefreshMinutes)) merged.autoRefreshMinutes = Number(config.autoRefreshMinutes);
@@ -430,6 +432,7 @@ function hasConfiguredSources(config) {
     config.workbook,
     config.equipos,
     config.avance,
+    config.planning,
     config.materiales,
     config.finanzas,
     ...Object.values(config.processSheets || {}),
@@ -623,6 +626,7 @@ function renderDashboardView() {
   const summary = getSummary(state.data);
   const processStats = getProcessStats(state.data);
   const assemblyTimeStats = getDashboardAssemblyTimeStats();
+  const planningStats = getDashboardPlanningStats(assemblyTimeStats);
   const statusStats = getDashboardStatusStats(summary);
   const deliveryStats = getFinishedDeliveryStats(summary);
 
@@ -679,7 +683,119 @@ function renderDashboardView() {
       </section>
     </div>
 
+    ${renderDashboardPlanning(planningStats)}
+
     ${renderDashboardAssemblyTimes(assemblyTimeStats)}
+  `;
+}
+
+function getDashboardPlanningStats(assemblyTimeStats) {
+  const planningByProcess = new Map((state.data.planning || []).map((item) => [item.processId, item]));
+  const today = startOfLocalDay(new Date());
+
+  return assemblyTimeStats.map((hours) => {
+    const plan = planningByProcess.get(hours.id);
+    if (!plan || !plan.active) return { ...hours, planned: false };
+
+    const plannedStart = parseIsoLocalDate(plan.startDate);
+    const deadline = parseIsoLocalDate(plan.deadline);
+    const effectiveStart = plannedStart && plannedStart > today ? plannedStart : today;
+    const capacityMinutes = plan.workers * plan.hoursPerDay * 60;
+    const requiredDays = capacityMinutes > 0 ? Math.ceil(hours.pendingMinutes / capacityMinutes) : null;
+    const availableDays = deadline ? countWorkdaysInclusive(effectiveStart, deadline, plan.calendar) : null;
+    const forecastDate = requiredDays === null
+      ? null
+      : requiredDays === 0
+        ? effectiveStart
+        : addWorkdays(effectiveStart, requiredDays - 1, plan.calendar);
+    const bufferDays = forecastDate && deadline && forecastDate <= deadline
+      ? Math.max(countWorkdaysInclusive(addCalendarDays(forecastDate, 1), deadline, plan.calendar), 0)
+      : null;
+    const status = !deadline || requiredDays === null
+      ? "missing"
+      : forecastDate > deadline
+        ? "late"
+        : bufferDays <= 2
+          ? "risk"
+          : "ontime";
+    const ratio = availableDays > 0 && requiredDays !== null
+      ? requiredDays / availableDays
+      : requiredDays > 0 ? 1.2 : 0;
+
+    return {
+      ...hours,
+      ...plan,
+      planned: true,
+      effectiveStart,
+      deadlineDate: deadline,
+      forecastDate,
+      capacityMinutes,
+      requiredDays,
+      availableDays,
+      bufferDays,
+      ratio,
+      status,
+    };
+  });
+}
+
+function renderDashboardPlanning(items) {
+  const planned = items.filter((item) => item.planned);
+  if (!planned.length) return "";
+  const complete = planned.filter((item) => item.status !== "missing");
+  const ontime = complete.filter((item) => item.status === "ontime").length;
+  const risk = complete.filter((item) => item.status === "risk").length;
+  const late = complete.filter((item) => item.status === "late").length;
+
+  return `
+    <section class="panel planning-panel" style="margin-top: 14px;">
+      <div class="panel-header planning-header">
+        <div>
+          <p class="panel-label">Planeacion de ensambles</p>
+          <h2 class="panel-title">Pronostico de cumplimiento</h2>
+          <p class="panel-subtitle">Jornadas necesarias contra jornadas disponibles hasta la fecha limite.</p>
+        </div>
+        <div class="planning-summary" aria-label="Resumen de cumplimiento">
+          <span class="planning-summary-item ontime"><strong>${ontime}</strong> en tiempo</span>
+          <span class="planning-summary-item risk"><strong>${risk}</strong> en riesgo</span>
+          <span class="planning-summary-item late"><strong>${late}</strong> fuera de fecha</span>
+        </div>
+      </div>
+      <div class="planning-chart" role="img" aria-label="Comparacion por ensamble entre jornadas necesarias y disponibles">
+        ${planned.map(renderPlanningRow).join("")}
+      </div>
+      <p class="planning-footnote">Calculo: horas-hombre pendientes ÷ (trabajadores × horas de jornada). Se consideran ${escapeHtml(planned[0]?.calendar || "el calendario configurado")} y la fecha actual cuando el inicio ya paso.</p>
+    </section>
+  `;
+}
+
+function renderPlanningRow(item) {
+  const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Fuera de fecha", missing: "Dato incompleto" };
+  const required = item.requiredDays === null ? "-" : item.requiredDays;
+  const available = item.availableDays === null ? "-" : Math.max(item.availableDays, 0);
+  const width = clamp(item.ratio * 100, 0, 100);
+
+  return `
+    <article class="planning-row ${item.status}">
+      <div class="planning-name">
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${item.workers} ${item.workers === 1 ? "trabajador" : "trabajadores"} · ${item.hoursPerDay} h/jornada</span>
+      </div>
+      <div class="planning-bar-area">
+        <div class="planning-bar-labels">
+          <span><strong>${required}</strong> jornadas necesarias</span>
+          <span><strong>${available}</strong> disponibles</span>
+        </div>
+        <div class="planning-bar-track" aria-hidden="true">
+          <span class="planning-bar-value" style="width: ${width}%"></span>
+        </div>
+      </div>
+      <div class="planning-dates">
+        <span>Estimada <strong>${formatShortDate(item.forecastDate)}</strong></span>
+        <span>Limite <strong>${formatShortDate(item.deadlineDate)}</strong></span>
+      </div>
+      <span class="planning-status ${item.status}">${statusLabels[item.status]}</span>
+    </article>
   `;
 }
 
@@ -1541,6 +1657,7 @@ function createEmptyDataset() {
     source: "Sin datos cargados",
     equipos: [],
     progress: {},
+    planning: [],
     materiales: [],
     finanzas: [],
     financeColumns: [],
@@ -1687,6 +1804,11 @@ function applyCsvToDataset(data, kind, text) {
     return;
   }
 
+  if (kind === "planning") {
+    data.planning = parsePlanningCsv(text);
+    return;
+  }
+
   if (kind === "finanzas") {
     const parsed = parseFinanceCsv(text);
     data.finanzas = parsed.records;
@@ -1777,6 +1899,24 @@ function parseEquiposCsv(text) {
       updatedAt: new Date().toISOString(),
     };
   }).filter((equipo) => equipo.control && equipo.control !== "EQ-1");
+}
+
+function parsePlanningCsv(text) {
+  return csvToRecords(text).map((row) => {
+    const processId = normalizeKey(readField(row, ["id_ensamble", "id", "proceso"]));
+    const process = PROCESS_DEFS.find((item) => item.id === processId);
+    return {
+      processId,
+      name: readField(row, ["ensamble", "nombre"]) || process?.name || processId,
+      startDate: parseSheetDate(readField(row, ["fecha_inicio", "inicio"])),
+      deadline: parseSheetDate(readField(row, ["fecha_limite", "limite", "fecha_fin"])),
+      workers: Math.max(0, toNumber(readField(row, ["trabajadores", "personas", "operadores"]))),
+      hoursPerDay: Math.max(0, toNumber(readField(row, ["horas_jornada", "jornada", "horas_dia"]))),
+      calendar: normalizePlanningCalendar(readField(row, ["calendario"])),
+      active: ["si", "sí", "true", "1", "x", "activo"].includes(normalizeText(readField(row, ["activo", "activa"]))),
+      notes: readField(row, ["observaciones", "notas"]),
+    };
+  }).filter((item) => item.processId && PROCESS_DEFS.some((process) => process.id === item.processId));
 }
 
 function parseMaterialesCsv(text) {
@@ -2205,6 +2345,7 @@ function applyFinanceData(data, financeData) {
 
 function normalizeDataset(data) {
   data.progress = data.progress || {};
+  data.planning = data.planning || [];
   data.materiales = data.materiales || [];
   data.finanzas = data.finanzas || [];
   data.financeColumns = data.financeColumns || [];
@@ -3335,6 +3476,77 @@ function formatDate(value) {
   return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function formatShortDate(value) {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : parseIsoLocalDate(value);
+  if (!date || Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
+}
+
+function parseSheetDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (match) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function parseIsoLocalDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfLocalDay(value) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function addCalendarDays(value, days) {
+  const date = startOfLocalDay(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function normalizePlanningCalendar(value) {
+  return normalizeKey(value).includes("sab") ? "LUN-SAB" : "LUN-VIE";
+}
+
+function isPlanningWorkday(date, calendar) {
+  const day = date.getDay();
+  return day !== 0 && (calendar === "LUN-SAB" || day !== 6);
+}
+
+function countWorkdaysInclusive(start, end, calendar) {
+  if (!start || !end || start > end) return 0;
+  let total = 0;
+  for (let date = startOfLocalDay(start); date <= end; date = addCalendarDays(date, 1)) {
+    if (isPlanningWorkday(date, calendar)) total += 1;
+  }
+  return total;
+}
+
+function addWorkdays(start, workdays, calendar) {
+  let date = startOfLocalDay(start);
+  let remaining = Math.max(0, Number(workdays) || 0);
+  while (!isPlanningWorkday(date, calendar)) date = addCalendarDays(date, 1);
+  while (remaining > 0) {
+    date = addCalendarDays(date, 1);
+    if (isPlanningWorkday(date, calendar)) remaining -= 1;
+  }
+  return date;
+}
+
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 }
@@ -4026,6 +4238,7 @@ function createEmptyConfig() {
     workbook: "",
     equipos: "",
     avance: "",
+    planning: "",
     materiales: "",
     finanzas: "",
     processSheets: PROCESS_DEFS.reduce((acc, process) => {
@@ -4197,6 +4410,7 @@ function detectSourceTarget(text) {
   if (!key) return "";
   if (key.includes("avance_de_ensamble") || key.includes("archivo_completo") || key.includes("libro_completo")) return "workbook";
   if (key.includes("finanza") || key.includes("copia_de_hoja_1") || key.includes("estatus")) return "finanzas";
+  if (key.includes("planeacion") || key.includes("fecha_limite")) return "planning";
   if (key.includes("material")) return "materiales";
   if (key.includes("avance_general") || key.includes("por_unidad") || key.includes("unidad")) return "avance";
   if (key.includes("chasis") || key.includes("lista_equipo") || key.includes("equipo")) return "equipos";
