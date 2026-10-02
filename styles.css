@@ -466,6 +466,27 @@ button {
   margin-top: 4px;
 }
 
+.planning-name .planning-pending-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  margin-top: 7px;
+  padding: 4px 7px;
+  border: 1px solid rgba(31, 120, 184, 0.26);
+  border-radius: 999px;
+  color: var(--mc-blue);
+  background: #eef7fd;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.planning-name .planning-pending-hours strong {
+  color: inherit;
+  font-size: inherit;
+}
+
 .planning-bar-labels {
   display: flex;
   justify-content: space-between;

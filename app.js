@@ -780,6 +780,11 @@ function renderPlanningRow(item) {
       <div class="planning-name">
         <strong>${escapeHtml(item.name)}</strong>
         <span>${item.workers} ${item.workers === 1 ? "trabajador" : "trabajadores"} · ${item.hoursPerDay} h/jornada</span>
+        ${Number.isFinite(item.manualPendingMinutes) ? `
+          <span class="planning-pending-hours">
+            Horas pendientes <strong class="mono">${formatWorkDuration(item.manualPendingMinutes)}</strong>
+          </span>
+        ` : ""}
       </div>
       <div class="planning-bar-area">
         <div class="planning-bar-labels">
@@ -1905,6 +1910,7 @@ function parsePlanningCsv(text) {
   return csvToRecords(text).map((row) => {
     const processId = normalizeKey(readField(row, ["id_ensamble", "id", "proceso"]));
     const process = PROCESS_DEFS.find((item) => item.id === processId);
+    const manualPendingMinutes = parseHoursMinutesInput(readField(row, ["horas_pendientes", "horas_pendiente"]));
     return {
       processId,
       name: readField(row, ["ensamble", "nombre"]) || process?.name || processId,
@@ -1915,6 +1921,7 @@ function parsePlanningCsv(text) {
       calendar: normalizePlanningCalendar(readField(row, ["calendario"])),
       active: ["si", "sí", "true", "1", "x", "activo"].includes(normalizeText(readField(row, ["activo", "activa"]))),
       notes: readField(row, ["observaciones", "notas"]),
+      manualPendingMinutes,
     };
   }).filter((item) => item.processId && PROCESS_DEFS.some((process) => process.id === item.processId));
 }
@@ -3519,11 +3526,15 @@ function addCalendarDays(value, days) {
 }
 
 function normalizePlanningCalendar(value) {
-  return normalizeKey(value).includes("sab") ? "LUN-SAB" : "LUN-VIE";
+  const calendar = normalizeKey(value);
+  if (calendar.includes("dom")) return "LUN-DOM";
+  if (calendar.includes("sab")) return "LUN-SAB";
+  return "LUN-VIE";
 }
 
 function isPlanningWorkday(date, calendar) {
   const day = date.getDay();
+  if (calendar === "LUN-DOM") return true;
   return day !== 0 && (calendar === "LUN-SAB" || day !== 6);
 }
 
@@ -4062,6 +4073,23 @@ function parseProgressValue(value) {
 function toNumber(value) {
   const number = Number(String(value || "").replace(/[^0-9.-]/g, ""));
   return Number.isNaN(number) ? 0 : number;
+}
+
+function parseHoursMinutesInput(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+
+  const normalized = text.replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+
+  const [hoursText, minutesText = ""] = normalized.split(".");
+  const hours = Number(hoursText);
+  const minutes = minutesText
+    ? Number(minutesText.length === 1 ? `${minutesText}0` : minutesText)
+    : 0;
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
+  return (hours * 60) + minutes;
 }
 
 function mergeProgress(target, source) {
