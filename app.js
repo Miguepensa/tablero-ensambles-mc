@@ -4084,9 +4084,7 @@ function parseHoursMinutesInput(value) {
 
   const [hoursText, minutesText = ""] = normalized.split(".");
   const hours = Number(hoursText);
-  const minutes = minutesText
-    ? Number(minutesText.length === 1 ? `${minutesText}0` : minutesText)
-    : 0;
+  const minutes = minutesText ? Number(minutesText) : 0;
 
   if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) return null;
   return (hours * 60) + minutes;
