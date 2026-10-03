@@ -2751,6 +2751,22 @@ button {
     white-space: nowrap;
   }
 
+  .print-report-group .print-check-heading,
+  .print-report-group .print-check-cell {
+    width: 42px;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .print-checkbox {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #17212a;
+    border-radius: 2px;
+    background: #fff;
+  }
+
   .print-state {
     display: inline-block;
     padding: 2px 5px;

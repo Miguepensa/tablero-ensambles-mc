@@ -1743,6 +1743,7 @@ function renderPendingActivitiesReport(equipo, groups, total) {
                 <th>Subproceso</th>
                 <th>Estado</th>
                 <th>Tiempo</th>
+                <th class="print-check-heading">Hecho</th>
               </tr>
             </thead>
             <tbody>
@@ -1753,6 +1754,7 @@ function renderPendingActivitiesReport(equipo, groups, total) {
                   <td>${escapeHtml(activity.subprocess || group.process.name)}</td>
                   <td><span class="print-state ${activity.state}">${escapeHtml(captureLabel(activity.state))}</span></td>
                   <td>${Number(activity.minutes) || 0} min</td>
+                  <td class="print-check-cell"><span class="print-checkbox" aria-hidden="true"></span></td>
                 </tr>
               `).join("")}
             </tbody>
