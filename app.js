@@ -14,6 +14,8 @@ const PROCESS_DEFS = [
 
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "D" },
+  { id: "operacion", label: "Control operativo", icon: "O" },
+  { id: "divisiones", label: "Divisiones", icon: "V" },
   { id: "equipos", label: "Equipos", icon: "E" },
   { id: "detalle", label: "Detalle", icon: "U" },
   { id: "captura", label: "Captura", icon: "C" },
@@ -58,6 +60,9 @@ const BUNDLED_UNIT_ADVANCE_CSV = "data/avance-por-unidad.csv";
 const BUNDLED_QUALITY_FINAL_CSV = "data/pruebas-calidad-finales.csv";
 const PUBLIC_SOURCES_URL = "data/sources.json";
 const DEFAULT_AUTO_REFRESH_MINUTES = 5;
+const DAILY_CUTOFF_HOUR = 23;
+const DAILY_CUTOFF_MINUTE = 55;
+const INITIAL_BALANCE_DATE = "2026-10-02";
 const PROJECT_TOTAL_AMOUNT = 608197933;
 const STRUCTURAL_ACTIVITY_TIMES = [
   { name: "Barrenar angulos de defensa", minutes: 30 },
@@ -84,14 +89,17 @@ const STRUCTURAL_ACTIVITY_TIMES = [
 ];
 const STRUCTURAL_TOTAL_MINUTES = STRUCTURAL_ACTIVITY_TIMES.reduce((sum, activity) => sum + activity.minutes, 0);
 const STORAGE_KEY = "tablero-ensambles-config-v1";
+const DAILY_PRODUCTION_STORAGE_KEY = "tablero-ensambles-produccion-diaria-v1";
 const DATA_CACHE_DB_NAME = "tablero-ensambles-cache-v1";
 const DATA_CACHE_STORE = "datasets";
 const DATA_CACHE_KEY = "latest-drive-data";
 const app = document.getElementById("app");
 let autoRefreshTimer = null;
+let dailyCutoffTimer = null;
 
 let state = {
   view: "dashboard",
+  operationalProcess: "",
   query: "",
   selectedId: null,
   captureProcess: "estructurales",
@@ -122,6 +130,7 @@ let state = {
 state.selectedId = state.data.equipos[0]?.id || null;
 render();
 bootstrapData();
+scheduleDailyCutoff();
 
 app.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
@@ -139,6 +148,15 @@ app.addEventListener("click", (event) => {
       state.hoursProcess = process.id;
       state.hoursActivityQuery = "";
       state.view = "horas_general";
+      render();
+    }
+  }
+
+  if (action === "open-operational-process") {
+    const process = PROCESS_DEFS.find((item) => item.id === target.dataset.process);
+    if (process) {
+      state.operationalProcess = process.id;
+      state.view = "operacion";
       render();
     }
   }
@@ -209,6 +227,7 @@ app.addEventListener("click", (event) => {
     state.config = createEmptyConfig();
     saveConfig(state.config);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(DAILY_PRODUCTION_STORAGE_KEY);
     clearCachedDataset();
     state.data = createEmptyDataset();
     state.selectedId = null;
@@ -279,7 +298,7 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("keydown", (event) => {
-  if (!event.target.matches('[data-action="open-hours-process"]')) return;
+  if (!event.target.matches('[data-action="open-hours-process"], [data-action="open-operational-process"]')) return;
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   event.target.click();
@@ -322,6 +341,7 @@ async function bootstrapData() {
 
   if (hasCachedData) {
     state.data = normalizeDataset(cachedRecord.data);
+    recordDailyProductionSnapshot("cached");
     state.selectedId = state.data.equipos[0]?.id || null;
     state.toast = "Mostrando la ultima informacion guardada.";
     render();
@@ -357,6 +377,8 @@ async function bootstrapData() {
 
 async function loadDriveData(options = {}) {
   const { background = false, keepView = false, mergeWithCurrent = true } = options;
+  const snapshotType = options.snapshotType || (background ? "automatic" : "manual");
+  const snapshotDateKey = options.snapshotDateKey || "";
   const previousView = state.view;
   const previousSelectedId = state.selectedId;
   state.loading = !background;
@@ -368,6 +390,7 @@ async function loadDriveData(options = {}) {
   try {
     const imported = await buildDatasetFromConfig(state.config, mergeWithCurrent ? state.data : createEmptyDataset());
     state.data = imported;
+    recordDailyProductionSnapshot(snapshotType, snapshotDateKey);
     await saveCachedDataset(imported, state.config);
     state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
       ? previousSelectedId
@@ -444,9 +467,46 @@ function startAutoRefresh(minutes = DEFAULT_AUTO_REFRESH_MINUTES) {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = setInterval(() => {
     if (!state.loading && hasConfiguredSources(state.config)) {
-      loadDriveData({ background: true, keepView: true });
+      loadDriveData({ background: true, keepView: true, snapshotType: "automatic" });
     }
   }, safeMinutes * 60 * 1000);
+}
+
+function scheduleDailyCutoff() {
+  if (dailyCutoffTimer) clearTimeout(dailyCutoffTimer);
+  const now = new Date();
+  let target = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    DAILY_CUTOFF_HOUR,
+    DAILY_CUTOFF_MINUTE,
+    0,
+    0,
+  );
+  const todayRecordExists = hasDailyCutoffRecord(localDateKey(now));
+  if (now >= target && todayRecordExists) target.setDate(target.getDate() + 1);
+  const delay = Math.max(target.getTime() - now.getTime(), 1000);
+  const cutoffDateKey = localDateKey(target);
+
+  dailyCutoffTimer = setTimeout(async () => {
+    if (!state.loading && hasConfiguredSources(state.config)) {
+      await loadDriveData({
+        background: true,
+        keepView: true,
+        snapshotType: "daily-cutoff",
+        snapshotDateKey: cutoffDateKey,
+      });
+    }
+    scheduleDailyCutoff();
+  }, delay);
+}
+
+function hasDailyCutoffRecord(dateKey) {
+  const history = loadDailyProductionHistory();
+  return Object.values(history.processes || {}).some((processHistory) => (
+    processHistory?.[dateKey]?.snapshotType === "daily-cutoff"
+  ));
 }
 
 async function loadFinanceDrive() {
@@ -600,6 +660,8 @@ function renderKicker(view) {
   const source = escapeHtml(state.data.source || DEMO_SOURCE);
   const copy = {
     dashboard: `${summary.total} unidades activas, ${summary.finished} terminadas y avance global de ${formatPercent(summary.global)}. Fuente: ${source}.`,
+    operacion: "Planeado contra operativo, capacidad de personal y cumplimiento por ensamble.",
+    divisiones: "Unidades creadas, pendientes y horas-hombre faltantes agrupadas por division.",
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
     detalle: "Avance por proceso, cobertura de actividades y datos principales de la unidad.",
     captura: "Registro rapido de actividades por proceso para la unidad seleccionada.",
@@ -612,6 +674,8 @@ function renderKicker(view) {
 }
 
 function renderCurrentView() {
+  if (state.view === "operacion") return renderOperationalControlView();
+  if (state.view === "divisiones") return renderDivisionesView();
   if (state.view === "equipos") return renderEquiposView();
   if (state.view === "detalle") return renderDetalleView();
   if (state.view === "captura") return renderCapturaView();
@@ -689,6 +753,381 @@ function renderDashboardView() {
   `;
 }
 
+function renderOperationalControlView() {
+  const items = getDashboardPlanningStats(getDashboardAssemblyTimeStats())
+    .filter((item) => item.planned)
+    .sort((a, b) => Number(b.id === state.operationalProcess) - Number(a.id === state.operationalProcess));
+  if (!items.length) {
+    return `<div class="empty-state">No hay ensambles activos configurados en PLANEACION_ENSAMBLES.</div>`;
+  }
+
+  const validCompliance = items.filter((item) => Number.isFinite(item.operationalCompliance));
+  const requiredDailyTotal = validCompliance.reduce((sum, item) => sum + (item.requiredDailyMinutes || 0), 0);
+  const operationalDailyTotal = validCompliance.reduce((sum, item) => sum + (item.operationalDailyMinutes || 0), 0);
+  const globalCompliance = requiredDailyTotal > 0 ? (operationalDailyTotal / requiredDailyTotal) * 100 : null;
+  const assignedWorkers = items.reduce((sum, item) => sum + (item.workers || 0), 0);
+  const requiredWorkers = items.reduce((sum, item) => sum + (item.requiredWorkers || 0), 0);
+  const ontime = items.filter((item) => item.status === "ontime").length;
+  const risk = items.filter((item) => item.status === "risk").length;
+  const late = items.filter((item) => item.status === "late").length;
+  const complianceMetricStatus = globalCompliance === null
+    ? "en-proceso"
+    : globalCompliance >= 100 ? "terminado" : globalCompliance >= 90 ? "correccion" : "detenido";
+
+  return `
+    <div class="grid metrics operation-metrics">
+      ${renderMetric("Cumplimiento global", globalCompliance === null ? "-" : `${Math.round(globalCompliance)}%`, "operativo contra requerido", complianceMetricStatus)}
+      ${renderMetric("En tiempo", ontime, `de ${items.length} ensambles`, "terminado")}
+      ${renderMetric("Atencion", risk + late, `${risk} en riesgo · ${late} atrasados`, risk + late ? "correccion" : "terminado")}
+      ${renderMetric("Personal", assignedWorkers, `${requiredWorkers} personas requeridas`, assignedWorkers >= requiredWorkers ? "terminado" : "detenido")}
+    </div>
+
+    <section class="panel operation-panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Direccion de ensambles</p>
+          <h2 class="panel-title">Planeado contra operativo</h2>
+          <p class="panel-subtitle">Meta fija desde el saldo inicial contra el avance operativo actualizado desde Drive.</p>
+        </div>
+        <span class="badge">${items.length} ensambles activos</span>
+      </div>
+      <div class="operation-control-grid">
+        ${items.map(renderOperationalControlCard).join("")}
+      </div>
+      <p class="planning-footnote">El saldo inicial queda fijado al 02/10/2026 con HORAS_PENDIENTES. FECHA_INICIO conserva el comienzo formal del plan. Actualizar Captura cambia el saldo actual y el pronostico, pero no modifica el saldo inicial ni la meta diaria original.</p>
+    </section>
+  `;
+}
+
+function renderOperationalControlCard(item) {
+  const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Atrasado", missing: "Dato incompleto" };
+  const dailyTarget = Number.isFinite(item.requiredDailyMinutes) ? formatWorkDuration(item.requiredDailyMinutes) : "-";
+  const operationalDaily = Number.isFinite(item.operationalDailyMinutes) ? formatWorkDuration(item.operationalDailyMinutes) : "-";
+  const dailyCapacity = item.capacityMinutes > 0 ? formatWorkDuration(item.capacityMinutes) : "-";
+  const compliance = Number.isFinite(item.operationalCompliance) ? Math.max(0, item.operationalCompliance) : null;
+  const complianceWidth = compliance === null ? 0 : clamp(compliance, 0, 100);
+  const staffingDifference = Number.isFinite(item.requiredWorkers) ? item.workers - item.requiredWorkers : null;
+  const staffingMessage = staffingDifference === null
+    ? "Falta completar jornada o fechas"
+    : staffingDifference < 0
+      ? `Faltan ${Math.abs(staffingDifference)} ${Math.abs(staffingDifference) === 1 ? "persona" : "personas"}`
+      : staffingDifference === 0
+        ? "Personal justo para la meta"
+        : `Margen de ${staffingDifference} ${staffingDifference === 1 ? "persona" : "personas"}`;
+
+  return `
+    <article class="operation-card ${item.status} ${item.id === state.operationalProcess ? "selected" : ""}" data-operational-process="${escapeAttr(item.id)}">
+      <div class="operation-card-header">
+        <div>
+          <h3>${escapeHtml(item.name)}</h3>
+          <p>${escapeHtml(item.calendar)} · ${item.hoursPerDay} h por jornada</p>
+        </div>
+        <span class="planning-status ${item.status}">${statusLabels[item.status]}</span>
+      </div>
+
+      <div class="operation-schedule">
+        <div><span>Fecha del saldo</span><strong>${formatShortDate(item.baselineDate)}</strong></div>
+        <div><span>Inicio del plan</span><strong>${formatShortDate(parseIsoLocalDate(item.startDate))}</strong></div>
+        <div><span>Limite</span><strong>${formatShortDate(item.deadlineDate)}</strong></div>
+        <div><span>Dias trabajados</span><strong>${item.elapsedScheduleDays ?? "-"}</strong></div>
+        <div><span>Dias restantes</span><strong>${item.remainingDays === null ? "-" : Math.max(item.remainingDays, 0)}</strong></div>
+      </div>
+
+      <div class="operation-output-grid">
+        <div><span>Meta diaria</span><strong class="mono">${dailyTarget}/dia</strong></div>
+        <div><span>Producción diaria</span><strong class="mono">${operationalDaily}/dia</strong></div>
+        <div><span>Capacidad diaria</span><strong class="mono">${dailyCapacity}/dia</strong></div>
+        <div><span>Saldo inicial</span><strong class="mono">${formatWorkDuration(item.planningPendingMinutes)}</strong></div>
+        <div><span>Saldo actual</span><strong class="mono">${formatWorkDuration(item.currentPendingMinutes)}</strong></div>
+        <div><span>Avance desde el saldo</span><strong class="mono">${item.progressSinceBaselineMinutes === null ? "-" : formatWorkDuration(item.progressSinceBaselineMinutes)}</strong></div>
+      </div>
+
+      <div class="operation-staffing ${staffingDifference !== null && staffingDifference < 0 ? "short" : "covered"}">
+        <div><span>Personal asignado</span><strong>${item.workers}</strong></div>
+        <div><span>Personal requerido</span><strong>${item.requiredWorkers ?? "-"}</strong></div>
+        <p>${staffingMessage}</p>
+      </div>
+
+      <div class="operation-compliance ${item.status}">
+        <div><span>Cumplimiento operativo</span><strong>${compliance === null ? "-" : `${Math.round(compliance)}%`}</strong></div>
+        <div class="operation-compliance-track" role="img" aria-label="Cumplimiento operativo ${compliance === null ? "sin dato" : `${Math.round(compliance)} por ciento`}">
+          <span style="width: ${complianceWidth}%"></span>
+        </div>
+      </div>
+
+      ${renderDailyProductionIndicators(item)}
+    </article>
+  `;
+}
+
+function renderDailyProductionIndicators(item) {
+  const days = getPlanningWorkdayDates(item);
+  if (!days.length) return "";
+  const history = loadDailyProductionHistory();
+  const processHistory = history.processes?.[item.id] || {};
+  const todayKey = localDateKey(new Date());
+  const todayRecord = processHistory[todayKey];
+  const cutoffLabel = todayRecord?.observedAt
+    ? `Ultimo corte: ${formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
+    : "Sin corte registrado hoy";
+
+  return `
+    <div class="daily-production">
+      <div class="daily-production-header">
+        <div>
+          <span>Semáforo diario</span>
+          <strong>Producción contra meta</strong>
+          <small>${escapeHtml(cutoffLabel)}</small>
+        </div>
+        <div class="daily-production-legend" aria-label="Criterio del semaforo diario">
+          <span class="green">Meta cumplida</span>
+          <span class="yellow">80% a 99%</span>
+          <span class="red">Menos de 80%</span>
+        </div>
+      </div>
+      <div class="daily-production-grid">
+        ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
+      </div>
+      <p>Se calcula con la diferencia del saldo acumulado de Drive entre el inicio y la ultima actualizacion de cada dia.</p>
+    </div>
+  `;
+}
+
+function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes) {
+  const dateKey = localDateKey(date);
+  const record = processHistory[dateKey];
+  const isFuture = dateKey > todayKey;
+  const productionMinutes = record
+    ? Math.max(Number(record.startPendingMinutes) - Number(record.latestPendingMinutes), 0)
+    : null;
+  const percent = productionMinutes !== null && targetMinutes > 0
+    ? (productionMinutes / targetMinutes) * 100
+    : null;
+  const status = isFuture
+    ? "future"
+    : percent === null
+      ? "missing"
+      : percent >= 100
+        ? "green"
+        : percent >= 80
+          ? "yellow"
+          : "red";
+  const statusText = isFuture
+    ? "Pendiente"
+    : percent === null
+      ? "Sin dato"
+      : `${Math.round(percent)}%`;
+  const weekday = date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "").slice(0, 3);
+  const detail = `${weekday} ${formatShortDate(date)} · ${statusText} · ${productionMinutes === null ? "sin lectura" : `${formatWorkDuration(productionMinutes)} producidas`}`;
+  const cutoffDetail = record?.observedAt
+    ? ` · corte ${formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})`
+    : "";
+
+  return `
+    <div class="daily-production-day ${status} ${dateKey === todayKey ? "today" : ""}" title="${escapeAttr(detail + cutoffDetail)}" aria-label="${escapeAttr(detail + cutoffDetail)}">
+      <span>${escapeHtml(weekday)}</span>
+    </div>
+  `;
+}
+
+function getPlanningWorkdayDates(item) {
+  const start = parseIsoLocalDate(item.startDate);
+  const deadline = item.deadlineDate;
+  if (!start || !deadline || start > deadline) return [];
+  const dates = [];
+  for (let date = startOfLocalDay(start); date <= deadline; date = addCalendarDays(date, 1)) {
+    if (isPlanningWorkday(date, item.calendar)) dates.push(date);
+  }
+  return dates;
+}
+
+function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDateKey = "") {
+  if (!state.data?.planning?.length || !state.data?.equipos?.length) return;
+  if (snapshotType === "automatic") return;
+  const history = loadDailyProductionHistory();
+  const dateKey = requestedDateKey || localDateKey(new Date());
+  const items = getDashboardPlanningStats(getDashboardAssemblyTimeStats()).filter((item) => item.planned);
+
+  history.processes = history.processes || {};
+  items.forEach((item) => {
+    const processHistory = history.processes[item.id] || {};
+    const existing = processHistory[dateKey];
+    if (snapshotType === "cached" && existing) return;
+    const priorRecord = Object.entries(processHistory)
+      .filter(([key]) => key < dateKey)
+      .sort(([a], [b]) => b.localeCompare(a))[0]?.[1];
+    const startPendingMinutes = existing?.startPendingMinutes
+      ?? priorRecord?.latestPendingMinutes
+      ?? item.planningPendingMinutes;
+
+    processHistory[dateKey] = {
+      startPendingMinutes,
+      latestPendingMinutes: item.currentPendingMinutes,
+      observedAt: new Date().toISOString(),
+      snapshotType,
+    };
+    history.processes[item.id] = processHistory;
+  });
+
+  try {
+    localStorage.setItem(DAILY_PRODUCTION_STORAGE_KEY, JSON.stringify(history));
+  } catch {
+    // El tablero sigue funcionando aunque el navegador no permita guardar historial local.
+  }
+}
+
+function loadDailyProductionHistory() {
+  try {
+    const history = JSON.parse(localStorage.getItem(DAILY_PRODUCTION_STORAGE_KEY) || "null");
+    return history && typeof history === "object" ? history : { processes: {} };
+  } catch {
+    return { processes: {} };
+  }
+}
+
+function localDateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatCutoffTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function snapshotTypeLabel(value) {
+  if (value === "manual") return "actualizacion manual";
+  if (value === "daily-cutoff") return "corte automatico";
+  if (value === "cached") return "ultima lectura guardada";
+  return "actualizacion automatica";
+}
+
+function renderDivisionesView() {
+  const divisions = getDivisionCompletionStats();
+  const totalUnits = divisions.reduce((sum, item) => sum + item.total, 0);
+  const createdUnits = divisions.reduce((sum, item) => sum + item.created, 0);
+  const missingUnits = divisions.reduce((sum, item) => sum + item.missing, 0);
+  const pendingMinutes = divisions.reduce((sum, item) => sum + item.pendingMinutes, 0);
+
+  return `
+    <div class="grid metrics division-metrics">
+      ${renderMetric("Divisiones", divisions.length, "con unidades", "en-proceso")}
+      ${renderMetric("Creadas", createdUnits, `de ${totalUnits} unidades`, "terminado")}
+      ${renderMetric("Faltan", missingUnits, "unidades por completar", missingUnits ? "correccion" : "terminado")}
+      ${renderMetric("Tiempo faltante", formatWorkDuration(pendingMinutes), `${Math.ceil(pendingMinutes / 480)} jornadas de 8 h`, missingUnits ? "en-proceso" : "terminado")}
+    </div>
+
+    <section class="panel division-panel" style="margin-top: 14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Avance por division</p>
+          <h2 class="panel-title">Unidades creadas y tiempo por completar</h2>
+          <p class="panel-subtitle">Una unidad se considera creada al alcanzar 99.5% de sus actividades. El tiempo se expresa en horas-hombre y jornadas de una persona.</p>
+        </div>
+        <span class="badge">Jornada base: 8 horas</span>
+      </div>
+      ${divisions.length ? `
+        <div class="division-grid">
+          ${divisions.map(renderDivisionCard).join("")}
+        </div>
+      ` : `<div class="empty-state">No hay divisiones disponibles en la fuente de equipos.</div>`}
+    </section>
+  `;
+}
+
+function getDivisionCompletionStats() {
+  const grouped = new Map();
+
+  (state.data.equipos || []).forEach((equipo) => {
+    const division = String(equipo.division || "Sin division").trim() || "Sin division";
+    const totals = progressTotals(getEquipmentProgress(state.data, equipo.id));
+    const created = totals.percent >= 99.5;
+    const current = grouped.get(division) || {
+      division,
+      total: 0,
+      created: 0,
+      missing: 0,
+      pendingMinutes: 0,
+    };
+
+    current.total += 1;
+    if (created) {
+      current.created += 1;
+    } else {
+      current.missing += 1;
+      current.pendingMinutes += getEquipmentPendingMinutes(equipo);
+    }
+    grouped.set(division, current);
+  });
+
+  return [...grouped.values()]
+    .map((item) => ({
+      ...item,
+      percent: item.total ? (item.created / item.total) * 100 : 0,
+      averagePendingMinutes: item.missing ? item.pendingMinutes / item.missing : 0,
+      workdays: item.pendingMinutes ? Math.ceil(item.pendingMinutes / 480) : 0,
+    }))
+    .sort((a, b) => b.missing - a.missing || b.pendingMinutes - a.pendingMinutes || a.division.localeCompare(b.division, "es"));
+}
+
+function getEquipmentPendingMinutes(equipo) {
+  return PROCESS_DEFS.reduce((total, process) => {
+    const definitions = getHoursDefinitions(process);
+    const activities = state.data.activities?.[`${equipo.id}:${process.id}`] || [];
+    const processPending = definitions.reduce((sum, definition, index) => {
+      const activity = activities[index] || activities.find((item) => activityNameKey(item.name) === activityNameKey(definition.name));
+      if (activity?.state === "hecho") return sum;
+      const minutes = getValidatedActivityMinutes(process.id, definition.name, definition.minutes, index);
+      return Number.isFinite(minutes) && minutes >= 0 ? sum + minutes : sum;
+    }, 0);
+    return total + processPending;
+  }, 0);
+}
+
+function renderDivisionCard(item) {
+  const percent = clamp(item.percent, 0, 100);
+  return `
+    <article class="division-card">
+      <div class="division-card-heading">
+        <div>
+          <h3>${escapeHtml(item.division)}</h3>
+          <p>${item.created} de ${item.total} unidades creadas</p>
+        </div>
+        <strong>${formatPercent(percent)}</strong>
+      </div>
+      <div class="division-progress" role="img" aria-label="${escapeAttr(`${item.division}: ${item.created} de ${item.total} unidades creadas`)}">
+        <span style="width: ${percent}%"></span>
+      </div>
+      <div class="division-card-stats">
+        <div>
+          <span>Creadas</span>
+          <strong>${item.created}</strong>
+        </div>
+        <div class="missing">
+          <span>Faltan</span>
+          <strong>${item.missing}</strong>
+        </div>
+      </div>
+      <div class="division-time-summary">
+        <div>
+          <span>Tiempo faltante</span>
+          <strong class="mono">${formatWorkDuration(item.pendingMinutes)}</strong>
+        </div>
+        <div>
+          <span>Jornadas de 8 h</span>
+          <strong>${item.workdays}</strong>
+        </div>
+        <div>
+          <span>Promedio por unidad faltante</span>
+          <strong class="mono">${formatWorkDuration(item.averagePendingMinutes)}</strong>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function getDashboardPlanningStats(assemblyTimeStats) {
   const planningByProcess = new Map((state.data.planning || []).map((item) => [item.processId, item]));
   const today = startOfLocalDay(new Date());
@@ -699,10 +1138,42 @@ function getDashboardPlanningStats(assemblyTimeStats) {
 
     const plannedStart = parseIsoLocalDate(plan.startDate);
     const deadline = parseIsoLocalDate(plan.deadline);
-    const effectiveStart = plannedStart && plannedStart > today ? plannedStart : today;
+    const baselineDate = parseIsoLocalDate(INITIAL_BALANCE_DATE);
+    const effectiveStart = plannedStart || today;
+    const hasFixedBaseline = Boolean(baselineDate && Number.isFinite(plan.manualPendingMinutes));
+    const planningPendingMinutes = Number.isFinite(plan.manualPendingMinutes)
+      ? plan.manualPendingMinutes
+      : hours.pendingMinutes;
     const capacityMinutes = plan.workers * plan.hoursPerDay * 60;
-    const requiredDays = capacityMinutes > 0 ? Math.ceil(hours.pendingMinutes / capacityMinutes) : null;
-    const availableDays = deadline ? countWorkdaysInclusive(effectiveStart, deadline, plan.calendar) : null;
+    const requiredDays = capacityMinutes > 0 ? Math.ceil(planningPendingMinutes / capacityMinutes) : null;
+    const availableDays = plannedStart && deadline
+      ? countWorkdaysInclusive(plannedStart, deadline, plan.calendar)
+      : null;
+    const remainingDays = !deadline
+      ? null
+      : today > deadline
+        ? 0
+        : countWorkdaysInclusive(today < effectiveStart ? effectiveStart : today, deadline, plan.calendar);
+    const requiredDailyMinutes = availableDays > 0
+      ? planningPendingMinutes / availableDays
+      : null;
+    const elapsedScheduleDays = !plannedStart || !deadline
+      ? null
+      : today < plannedStart
+        ? 0
+        : countWorkdaysInclusive(plannedStart, today > deadline ? deadline : today, plan.calendar);
+    const progressSinceBaselineMinutes = hasFixedBaseline
+      ? Math.max(planningPendingMinutes - hours.pendingMinutes, 0)
+      : null;
+    const operationalDailyMinutes = elapsedScheduleDays > 0 && progressSinceBaselineMinutes !== null
+      ? progressSinceBaselineMinutes / elapsedScheduleDays
+      : null;
+    const operationalCompliance = requiredDailyMinutes > 0 && operationalDailyMinutes !== null
+      ? (operationalDailyMinutes / requiredDailyMinutes) * 100
+      : requiredDailyMinutes === 0 ? 100 : null;
+    const requiredWorkers = requiredDailyMinutes > 0 && plan.hoursPerDay > 0
+      ? Math.ceil(requiredDailyMinutes / (plan.hoursPerDay * 60))
+      : requiredDailyMinutes === 0 ? 0 : null;
     const forecastDate = requiredDays === null
       ? null
       : requiredDays === 0
@@ -711,13 +1182,20 @@ function getDashboardPlanningStats(assemblyTimeStats) {
     const bufferDays = forecastDate && deadline && forecastDate <= deadline
       ? Math.max(countWorkdaysInclusive(addCalendarDays(forecastDate, 1), deadline, plan.calendar), 0)
       : null;
-    const status = !deadline || requiredDays === null
+    const capacityStatus = !deadline || requiredDays === null
       ? "missing"
       : forecastDate > deadline
         ? "late"
         : bufferDays <= 2
           ? "risk"
           : "ontime";
+    const status = operationalCompliance === null
+      ? capacityStatus
+      : operationalCompliance >= 100
+        ? "ontime"
+        : operationalCompliance >= 90
+          ? "risk"
+          : "late";
     const ratio = availableDays > 0 && requiredDays !== null
       ? requiredDays / availableDays
       : requiredDays > 0 ? 1.2 : 0;
@@ -726,14 +1204,26 @@ function getDashboardPlanningStats(assemblyTimeStats) {
       ...hours,
       ...plan,
       planned: true,
+      baselineDate,
       effectiveStart,
       deadlineDate: deadline,
       forecastDate,
+      planningPendingMinutes,
+      hasFixedBaseline,
+      currentPendingMinutes: hours.pendingMinutes,
+      progressSinceBaselineMinutes,
       capacityMinutes,
+      requiredDailyMinutes,
+      operationalDailyMinutes,
+      operationalCompliance,
+      requiredWorkers,
+      elapsedScheduleDays,
       requiredDays,
       availableDays,
+      remainingDays,
       bufferDays,
       ratio,
+      capacityStatus,
       status,
     };
   });
@@ -742,10 +1232,10 @@ function getDashboardPlanningStats(assemblyTimeStats) {
 function renderDashboardPlanning(items) {
   const planned = items.filter((item) => item.planned);
   if (!planned.length) return "";
-  const complete = planned.filter((item) => item.status !== "missing");
-  const ontime = complete.filter((item) => item.status === "ontime").length;
-  const risk = complete.filter((item) => item.status === "risk").length;
-  const late = complete.filter((item) => item.status === "late").length;
+  const complete = planned.filter((item) => item.capacityStatus !== "missing");
+  const ontime = complete.filter((item) => item.capacityStatus === "ontime").length;
+  const risk = complete.filter((item) => item.capacityStatus === "risk").length;
+  const late = complete.filter((item) => item.capacityStatus === "late").length;
 
   return `
     <section class="panel planning-panel" style="margin-top: 14px;">
@@ -758,22 +1248,79 @@ function renderDashboardPlanning(items) {
         <div class="planning-summary" aria-label="Resumen de cumplimiento">
           <span class="planning-summary-item ontime"><strong>${ontime}</strong> en tiempo</span>
           <span class="planning-summary-item risk"><strong>${risk}</strong> en riesgo</span>
-          <span class="planning-summary-item late"><strong>${late}</strong> fuera de fecha</span>
+          <span class="planning-summary-item late"><strong>${late}</strong> atrasados</span>
         </div>
       </div>
       <div class="planning-chart" role="img" aria-label="Comparacion por ensamble entre jornadas necesarias y disponibles">
-        ${planned.map(renderPlanningRow).join("")}
+        ${planned.map(renderDashboardPlanningRow).join("")}
       </div>
-      <p class="planning-footnote">Calculo: horas-hombre pendientes ÷ (trabajadores × horas de jornada). Se consideran ${escapeHtml(planned[0]?.calendar || "el calendario configurado")} y la fecha actual cuando el inicio ya paso.</p>
+      <p class="planning-footnote">El saldo inicial queda fijado al 02/10/2026. La meta usa ese saldo y los dias entre FECHA_INICIO y FECHA_LIMITE; no se vuelve a repartir cada dia. Selecciona un ensamble para abrir su analisis operativo.</p>
     </section>
   `;
 }
 
-function renderPlanningRow(item) {
+function renderDashboardPlanningRow(item) {
+  const status = item.capacityStatus || "missing";
   const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Fuera de fecha", missing: "Dato incompleto" };
   const required = item.requiredDays === null ? "-" : item.requiredDays;
   const available = item.availableDays === null ? "-" : Math.max(item.availableDays, 0);
   const width = clamp(item.ratio * 100, 0, 100);
+  const dailyTarget = item.requiredDailyMinutes === null ? "-" : formatWorkDuration(item.requiredDailyMinutes);
+  const dailyCapacity = item.capacityMinutes > 0 ? formatWorkDuration(item.capacityMinutes) : "-";
+
+  return `
+    <article class="planning-row planning-row-link ${status}" data-action="open-operational-process" data-process="${escapeAttr(item.id)}" role="button" tabindex="0" aria-label="Abrir control operativo de ${escapeAttr(item.name)}">
+      <div class="planning-name">
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${item.workers} ${item.workers === 1 ? "trabajador" : "trabajadores"} · ${item.hoursPerDay} h/jornada</span>
+        <span class="planning-baseline">
+          <span>Linea base fija</span>
+          <strong>Saldo al ${formatShortDate(item.baselineDate)}</strong>
+          <strong class="mono">Saldo ${formatWorkDuration(item.planningPendingMinutes)}</strong>
+        </span>
+      </div>
+      <div class="planning-bar-area">
+        <div class="planning-bar-labels">
+          <span><strong>${required}</strong> jornadas necesarias</span>
+          <span><strong>${available}</strong> disponibles</span>
+        </div>
+        <div class="planning-bar-track" aria-hidden="true">
+          <span class="planning-bar-value" style="width: ${width}%"></span>
+        </div>
+        <div class="planning-summary-output">
+          <span>Meta diaria del ensamble <strong class="mono">${dailyTarget}</strong></span>
+          <span>Capacidad actual <strong class="mono">${dailyCapacity}</strong></span>
+        </div>
+      </div>
+      <div class="planning-dates">
+        <span>Estimada <strong>${formatShortDate(item.forecastDate)}</strong></span>
+        <span>Limite <strong>${formatShortDate(item.deadlineDate)}</strong></span>
+      </div>
+      <span class="planning-status ${status}">${statusLabels[status]}</span>
+    </article>
+  `;
+}
+
+function renderPlanningRow(item) {
+  const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Atrasado", missing: "Dato incompleto" };
+  const required = item.requiredDays === null ? "-" : item.requiredDays;
+  const available = item.availableDays === null ? "-" : Math.max(item.availableDays, 0);
+  const width = clamp(item.ratio * 100, 0, 100);
+  const dailyTarget = item.requiredDailyMinutes === null
+    ? "-"
+    : formatWorkDuration(item.requiredDailyMinutes);
+  const dailyCapacity = item.capacityMinutes > 0
+    ? formatWorkDuration(item.capacityMinutes)
+    : "-";
+  const operationalDaily = Number.isFinite(item.operationalDailyMinutes)
+    ? formatWorkDuration(item.operationalDailyMinutes)
+    : "-";
+  const operationalCompliance = Number.isFinite(item.operationalCompliance)
+    ? Math.max(0, item.operationalCompliance)
+    : null;
+  const complianceWidth = operationalCompliance === null
+    ? 0
+    : clamp(operationalCompliance, 0, 100);
 
   return `
     <article class="planning-row ${item.status}">
@@ -793,6 +1340,20 @@ function renderPlanningRow(item) {
         </div>
         <div class="planning-bar-track" aria-hidden="true">
           <span class="planning-bar-value" style="width: ${width}%"></span>
+        </div>
+        <div class="planning-daily-output">
+          <span>Meta diaria<strong class="mono">${dailyTarget}/dia</strong></span>
+          <span>Producción diaria<strong class="mono">${operationalDaily}/dia</strong></span>
+          <span>Capacidad diaria<strong class="mono">${dailyCapacity}/dia</strong></span>
+        </div>
+        <div class="planning-compliance ${item.status}">
+          <div class="planning-compliance-label">
+            <span>Cumplimiento operativo</span>
+            <strong>${operationalCompliance === null ? "-" : `${Math.round(operationalCompliance)}%`}</strong>
+          </div>
+          <div class="planning-compliance-track" role="img" aria-label="Cumplimiento operativo ${operationalCompliance === null ? "sin dato" : `${Math.round(operationalCompliance)} por ciento`}">
+            <span style="width: ${complianceWidth}%"></span>
+          </div>
         </div>
       </div>
       <div class="planning-dates">
