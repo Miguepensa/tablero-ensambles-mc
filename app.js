@@ -244,6 +244,10 @@ app.addEventListener("click", (event) => {
   if (action === "set-capture-state") {
     updateActivityState(target.dataset.activity, target.dataset.state);
   }
+
+  if (action === "print-pending-activities") {
+    printPendingActivitiesReport();
+  }
 });
 
 app.addEventListener("input", (event) => {
@@ -1609,7 +1613,10 @@ function renderCapturaView() {
             <h2 class="panel-title">${escapeHtml(equipo.control)}</h2>
             <p class="panel-subtitle">${escapeHtml(process.name)}</p>
           </div>
-          ${renderStatusBadge(equipo.status)}
+          <div class="capture-header-actions">
+            ${renderStatusBadge(equipo.status)}
+            <button class="ghost-button" data-action="print-pending-activities">Imprimir pendientes / PDF</button>
+          </div>
         </div>
         <div class="source-fields">
           <label class="field">
@@ -1657,6 +1664,107 @@ function renderCapturaView() {
         </div>
       </section>
     </div>
+  `;
+}
+
+function printPendingActivitiesReport() {
+  const equipo = getSelectedEquipo();
+  if (!equipo) {
+    state.toast = "Selecciona una unidad antes de generar el reporte.";
+    render();
+    return;
+  }
+
+  const groups = PROCESS_DEFS.map((process) => {
+    const activities = getCaptureActivities(equipo.id, process)
+      .filter((activity) => activity.state !== "hecho");
+    return { process, activities };
+  }).filter((group) => group.activities.length > 0);
+  const total = groups.reduce((sum, group) => sum + group.activities.length, 0);
+
+  if (!total) {
+    state.toast = "Esta unidad no tiene actividades pendientes ni correcciones.";
+    render();
+    return;
+  }
+
+  document.querySelector(".print-report")?.remove();
+  document.body.insertAdjacentHTML("beforeend", renderPendingActivitiesReport(equipo, groups, total));
+
+  const cleanup = () => document.querySelector(".print-report")?.remove();
+  window.addEventListener("afterprint", cleanup, { once: true });
+  requestAnimationFrame(() => window.print());
+}
+
+function renderPendingActivitiesReport(equipo, groups, total) {
+  const generatedAt = new Date().toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const pending = groups.reduce((sum, group) => sum + group.activities.filter((activity) => activity.state === "pendiente").length, 0);
+  const corrections = total - pending;
+
+  return `
+    <main class="print-report">
+      <header class="print-report-header">
+        <div>
+          <p>Tablero Ensambles MC</p>
+          <h1>Actividades pendientes por unidad</h1>
+          <span>Generado: ${escapeHtml(generatedAt)}</span>
+        </div>
+        <div class="print-report-unit">
+          <strong>${escapeHtml(equipo.control || equipo.id)}</strong>
+          <span>VIN: ${escapeHtml(equipo.vin || "-")}</span>
+          <span>División: ${escapeHtml(equipo.division || "-")}</span>
+        </div>
+      </header>
+
+      <section class="print-report-summary">
+        <div><span>Total por atender</span><strong>${total}</strong></div>
+        <div><span>Pendientes</span><strong>${pending}</strong></div>
+        <div><span>Correcciones</span><strong>${corrections}</strong></div>
+        <div><span>Ensambles afectados</span><strong>${groups.length}</strong></div>
+      </section>
+
+      ${groups.map((group) => `
+        <section class="print-report-group">
+          <div class="print-report-group-title">
+            <h2>${escapeHtml(group.process.name)}</h2>
+            <span>${group.activities.length} ${group.activities.length === 1 ? "actividad" : "actividades"}</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Actividad</th>
+                <th>Subproceso</th>
+                <th>Estado</th>
+                <th>Tiempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${group.activities.map((activity, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${escapeHtml(activity.name)}</td>
+                  <td>${escapeHtml(activity.subprocess || group.process.name)}</td>
+                  <td><span class="print-state ${activity.state}">${escapeHtml(captureLabel(activity.state))}</span></td>
+                  <td>${Number(activity.minutes) || 0} min</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </section>
+      `).join("")}
+
+      <footer class="print-report-footer">
+        <span>Incluye todas las actividades pendientes y en corrección registradas al momento de generar el reporte.</span>
+        <span>Unidad ${escapeHtml(equipo.control || equipo.id)}</span>
+      </footer>
+    </main>
   `;
 }
 
