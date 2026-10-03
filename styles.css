@@ -674,13 +674,14 @@ button {
 
 .operation-control-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
 .operation-card {
+  scroll-margin-top: 16px;
   min-width: 0;
-  padding: 16px;
+  padding: 18px 20px;
   border: 1px solid var(--line);
   border-top: 3px solid var(--mc-blue);
   border-radius: 9px;
@@ -697,6 +698,26 @@ button {
 
 .operation-card.selected {
   box-shadow: 0 0 0 2px rgba(31, 120, 184, 0.24), 0 10px 24px rgba(13, 63, 102, 0.12);
+}
+
+.operation-title-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.operation-order {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--mc-blue);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .operation-card-header {
@@ -729,11 +750,11 @@ button {
 }
 
 .operation-schedule {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .operation-output-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .operation-schedule > div,
@@ -955,14 +976,16 @@ button {
 }
 
 @media (max-width: 1180px) {
-  .operation-metrics,
-  .operation-control-grid {
+  .operation-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .operation-schedule,
+  .operation-schedule {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .operation-output-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .daily-production-header {
@@ -979,6 +1002,11 @@ button {
   .operation-control-grid,
   .operation-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .operation-schedule,
+  .operation-output-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

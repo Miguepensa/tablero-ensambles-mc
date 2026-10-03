@@ -158,6 +158,10 @@ app.addEventListener("click", (event) => {
       state.operationalProcess = process.id;
       state.view = "operacion";
       render();
+      requestAnimationFrame(() => {
+        const selectedCard = document.querySelector(`[data-operational-process="${process.id}"]`);
+        selectedCard?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
   }
 
@@ -755,8 +759,7 @@ function renderDashboardView() {
 
 function renderOperationalControlView() {
   const items = getDashboardPlanningStats(getDashboardAssemblyTimeStats())
-    .filter((item) => item.planned)
-    .sort((a, b) => Number(b.id === state.operationalProcess) - Number(a.id === state.operationalProcess));
+    .filter((item) => item.planned);
   if (!items.length) {
     return `<div class="empty-state">No hay ensambles activos configurados en PLANEACION_ENSAMBLES.</div>`;
   }
@@ -792,14 +795,14 @@ function renderOperationalControlView() {
         <span class="badge">${items.length} ensambles activos</span>
       </div>
       <div class="operation-control-grid">
-        ${items.map(renderOperationalControlCard).join("")}
+        ${items.map((item, index) => renderOperationalControlCard(item, index)).join("")}
       </div>
       <p class="planning-footnote">El saldo inicial queda fijado al 02/10/2026 con HORAS_PENDIENTES. FECHA_INICIO conserva el comienzo formal del plan. Actualizar Captura cambia el saldo actual y el pronostico, pero no modifica el saldo inicial ni la meta diaria original.</p>
     </section>
   `;
 }
 
-function renderOperationalControlCard(item) {
+function renderOperationalControlCard(item, index = 0) {
   const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Atrasado", missing: "Dato incompleto" };
   const dailyTarget = Number.isFinite(item.requiredDailyMinutes) ? formatWorkDuration(item.requiredDailyMinutes) : "-";
   const operationalDaily = Number.isFinite(item.operationalDailyMinutes) ? formatWorkDuration(item.operationalDailyMinutes) : "-";
@@ -819,7 +822,10 @@ function renderOperationalControlCard(item) {
     <article class="operation-card ${item.status} ${item.id === state.operationalProcess ? "selected" : ""}" data-operational-process="${escapeAttr(item.id)}">
       <div class="operation-card-header">
         <div>
-          <h3>${escapeHtml(item.name)}</h3>
+          <div class="operation-title-line">
+            <span class="operation-order">${String(index + 1).padStart(2, "0")}</span>
+            <h3>${escapeHtml(item.name)}</h3>
+          </div>
           <p>${escapeHtml(item.calendar)} · ${item.hoursPerDay} h por jornada</p>
         </div>
         <span class="planning-status ${item.status}">${statusLabels[item.status]}</span>
