@@ -248,6 +248,10 @@ app.addEventListener("click", (event) => {
   if (action === "print-pending-activities") {
     printPendingActivitiesReport();
   }
+
+  if (action === "print-general-pending-activities") {
+    printGeneralPendingActivitiesReport();
+  }
 });
 
 app.addEventListener("input", (event) => {
@@ -1615,7 +1619,8 @@ function renderCapturaView() {
           </div>
           <div class="capture-header-actions">
             ${renderStatusBadge(equipo.status)}
-            <button class="ghost-button" data-action="print-pending-activities">Imprimir pendientes / PDF</button>
+            <button class="ghost-button" data-action="print-pending-activities">PDF de la unidad</button>
+            <button class="solid-button" data-action="print-general-pending-activities">PDF general</button>
           </div>
         </div>
         <div class="source-fields">
@@ -1729,6 +1734,8 @@ function renderPendingActivitiesReport(equipo, groups, total) {
         <div><span>Ensambles afectados</span><strong>${groups.length}</strong></div>
       </section>
 
+      <p class="print-time-adjustment">Para este formato de impresión, los tiempos se muestran con una reducción del 25%. Este ajuste no modifica el tablero ni Drive.</p>
+
       ${groups.map((group) => `
         <section class="print-report-group">
           <div class="print-report-group-title">
@@ -1753,7 +1760,7 @@ function renderPendingActivitiesReport(equipo, groups, total) {
                   <td>${escapeHtml(activity.name)}</td>
                   <td>${escapeHtml(activity.subprocess || group.process.name)}</td>
                   <td><span class="print-state ${activity.state}">${escapeHtml(captureLabel(activity.state))}</span></td>
-                  <td>${Number(activity.minutes) || 0} min</td>
+                  <td>${formatPrintMinutes(activity.minutes)}</td>
                   <td class="print-check-cell"><span class="print-checkbox" aria-hidden="true"></span></td>
                 </tr>
               `).join("")}
@@ -1762,11 +1769,187 @@ function renderPendingActivitiesReport(equipo, groups, total) {
         </section>
       `).join("")}
 
+      ${renderPrintSignatures()}
+
       <footer class="print-report-footer">
         <span>Incluye todas las actividades pendientes y en corrección registradas al momento de generar el reporte.</span>
         <span>Unidad ${escapeHtml(equipo.control || equipo.id)}</span>
       </footer>
     </main>
+  `;
+}
+
+function printGeneralPendingActivitiesReport() {
+  const report = buildGeneralPendingActivitiesReport();
+  if (!report.totalPending) {
+    state.toast = "No hay actividades pendientes ni correcciones en las unidades cargadas.";
+    render();
+    return;
+  }
+
+  document.querySelector(".print-report")?.remove();
+  document.body.insertAdjacentHTML("beforeend", renderGeneralPendingActivitiesReport(report));
+  const cleanup = () => document.querySelector(".print-report")?.remove();
+  window.addEventListener("afterprint", cleanup, { once: true });
+  requestAnimationFrame(() => window.print());
+}
+
+function buildGeneralPendingActivitiesReport() {
+  const groups = PROCESS_DEFS.map((process) => {
+    const activityMap = new Map();
+    let totalActivities = 0;
+    let pendingActivities = 0;
+    let corrections = 0;
+
+    state.data.equipos.forEach((equipo) => {
+      const activities = getCaptureActivities(equipo.id, process);
+      totalActivities += activities.length;
+      activities.forEach((activity) => {
+        if (activity.state === "hecho") return;
+        pendingActivities += 1;
+        if (activity.state === "correccion") corrections += 1;
+        const key = activity.id || normalizeKey(activity.name);
+        const current = activityMap.get(key) || {
+          name: activity.name,
+          subprocess: activity.subprocess || process.name,
+          minutes: Number(activity.minutes) || 0,
+          pending: 0,
+          corrections: 0,
+        };
+        current.pending += 1;
+        if (activity.state === "correccion") current.corrections += 1;
+        activityMap.set(key, current);
+      });
+    });
+
+    return {
+      process,
+      totalActivities,
+      completedActivities: Math.max(totalActivities - pendingActivities, 0),
+      pendingActivities,
+      corrections,
+      percent: totalActivities > 0 ? ((totalActivities - pendingActivities) / totalActivities) * 100 : 0,
+      activities: [...activityMap.values()].sort((a, b) => b.pending - a.pending || a.name.localeCompare(b.name, "es")),
+    };
+  });
+
+  return {
+    groups,
+    units: state.data.equipos.length,
+    totalPending: groups.reduce((sum, group) => sum + group.pendingActivities, 0),
+    totalCorrections: groups.reduce((sum, group) => sum + group.corrections, 0),
+    totalActivities: groups.reduce((sum, group) => sum + group.totalActivities, 0),
+  };
+}
+
+function renderGeneralPendingActivitiesReport(report) {
+  const generatedAt = new Date().toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `
+    <main class="print-report general-print-report">
+      <header class="print-report-header">
+        <div>
+          <p>Tablero Ensambles MC</p>
+          <h1>Actividades pendientes generales</h1>
+          <span>Generado: ${escapeHtml(generatedAt)}</span>
+        </div>
+        <div class="print-report-unit">
+          <strong>${report.units} grúas</strong>
+          <span>Alcance: todos los ensambles</span>
+          <span>Objetivo: llegar al 100%</span>
+        </div>
+      </header>
+
+      <section class="print-report-summary">
+        <div><span>Total por atender</span><strong>${report.totalPending.toLocaleString("es-MX")}</strong></div>
+        <div><span>Grúas evaluadas</span><strong>${report.units.toLocaleString("es-MX")}</strong></div>
+        <div><span>Actividades evaluadas</span><strong>${report.totalActivities.toLocaleString("es-MX")}</strong></div>
+        <div><span>Ensambles</span><strong>${report.groups.length}</strong></div>
+      </section>
+
+      <section class="general-process-summary">
+        <table>
+          <thead>
+            <tr><th>Ensamble</th><th>Realizadas</th><th>Faltan</th></tr>
+          </thead>
+          <tbody>
+            ${report.groups.map((group) => `
+              <tr>
+                <td>${escapeHtml(group.process.name)}</td>
+                <td>${group.completedActivities.toLocaleString("es-MX")} / ${group.totalActivities.toLocaleString("es-MX")}</td>
+                <td><strong>${group.pendingActivities.toLocaleString("es-MX")}</strong></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </section>
+
+      ${report.groups.filter((group) => group.pendingActivities > 0).map((group) => `
+        <section class="print-report-group general-process-group">
+          <div class="print-report-group-title">
+            <h2>${escapeHtml(group.process.name)}</h2>
+            <span>Faltan ${group.pendingActivities.toLocaleString("es-MX")} para llegar al 100%</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Actividad</th>
+                <th>Subproceso</th>
+                <th>Grúas pendientes</th>
+                <th class="print-check-heading">Hecho</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${group.activities.map((activity, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${escapeHtml(activity.name)}</td>
+                  <td>${escapeHtml(activity.subprocess)}</td>
+                  <td>${activity.pending.toLocaleString("es-MX")}</td>
+                  <td class="print-check-cell"><span class="print-checkbox" aria-hidden="true"></span></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </section>
+      `).join("")}
+
+      ${renderPrintSignatures()}
+
+      <footer class="print-report-footer">
+        <span>Resumen general calculado con el último estado cargado desde Drive.</span>
+        <span>${report.units} grúas evaluadas</span>
+      </footer>
+    </main>
+  `;
+}
+
+function formatPrintMinutes(minutes) {
+  const adjusted = Math.max(Number(minutes) || 0, 0) * 0.75;
+  return `${Number.isInteger(adjusted) ? adjusted : adjusted.toFixed(1)} min`;
+}
+
+function renderPrintSignatures() {
+  return `
+    <section class="print-signatures">
+      <div>
+        <span class="signature-line"></span>
+        <strong>Jefe de ensamble</strong>
+        <span>Nombre y firma</span>
+      </div>
+      <div>
+        <span class="signature-line"></span>
+        <strong>Responsable de hojas</strong>
+        <span>Nombre y firma</span>
+      </div>
+    </section>
   `;
 }
 

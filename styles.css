@@ -2689,6 +2689,45 @@ button {
     display: block;
   }
 
+  .print-time-adjustment {
+    margin: 9px 0 0;
+    padding: 7px 9px;
+    border: 1px solid #edc98f;
+    border-radius: 5px;
+    color: #74450d;
+    background: #fff8e8;
+    font-size: 8px;
+    font-weight: 700;
+  }
+
+  .general-process-summary {
+    margin-top: 12px;
+    break-inside: avoid-page;
+  }
+
+  .general-process-summary table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .general-process-summary th,
+  .general-process-summary td {
+    padding: 5px 7px;
+    border: 1px solid #d7e0e6;
+    text-align: left;
+  }
+
+  .general-process-summary th {
+    color: #fff;
+    background: #1f78b8;
+    font-size: 8px;
+    text-transform: uppercase;
+  }
+
+  .general-process-summary td:nth-child(n + 2) {
+    text-align: right;
+  }
+
   .print-report-summary span {
     color: #62727e;
     font-size: 8px;
@@ -2765,6 +2804,51 @@ button {
     border: 1.5px solid #17212a;
     border-radius: 2px;
     background: #fff;
+  }
+
+  .general-process-group {
+    break-before: page;
+    break-inside: auto;
+  }
+
+  .general-process-group .print-report-group-title {
+    break-after: avoid-page;
+  }
+
+  .general-process-group table {
+    font-size: 8px;
+  }
+
+  .print-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 42px;
+    margin-top: 34px;
+    padding: 0 24px;
+    break-inside: avoid-page;
+  }
+
+  .print-signatures > div {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    text-align: center;
+  }
+
+  .signature-line {
+    width: 100%;
+    height: 28px;
+    border-bottom: 1px solid #17212a;
+  }
+
+  .print-signatures strong {
+    margin-top: 3px;
+    font-size: 10px;
+  }
+
+  .print-signatures > div > span:last-child {
+    color: #62727e;
+    font-size: 8px;
   }
 
   .print-state {
