@@ -2597,6 +2597,104 @@ button {
   gap: 8px;
 }
 
+.pdf-actions,
+.pdf-toolbar,
+.pdf-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.pdf-actions {
+  justify-content: flex-end;
+}
+
+.pdf-toolbar {
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pdf-toolbar .field {
+  min-width: min(320px, 100%);
+}
+
+.pdf-legend {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pdf-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-legend strong,
+.pdf-legend i {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--mc-blue);
+  background: var(--mc-blue-soft);
+  font-style: normal;
+}
+
+.pdf-legend i {
+  background: #fff;
+}
+
+.pdf-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pdf-preview-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.pdf-preview-table th,
+.pdf-preview-table td {
+  padding: 8px;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+.pdf-preview-table th:first-child,
+.pdf-preview-table td:first-child {
+  min-width: 280px;
+  text-align: left;
+}
+
+.pdf-preview-table th small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.pdf-preview-table .preview-done {
+  color: var(--mc-blue);
+  background: var(--mc-blue-soft);
+  font-weight: 800;
+}
+
+.pdf-preview-table .preview-pending {
+  background: #fff8e8;
+}
+
+.compact-empty {
+  min-height: 140px;
+}
+
 .print-report {
   display: none;
 }
@@ -2819,6 +2917,381 @@ button {
     font-size: 8px;
   }
 
+  .general-activity-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 7px;
+  }
+
+  .general-activity-block {
+    border: 1px solid #d7e0e6;
+    border-radius: 5px;
+    break-inside: auto;
+    overflow: hidden;
+  }
+
+  .general-activity-heading {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto 20px;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 7px;
+    background: #edf3f7;
+    break-after: avoid-page;
+  }
+
+  .general-activity-number {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    color: #fff;
+    background: #1f78b8;
+    font-size: 8px;
+    font-weight: 700;
+  }
+
+  .general-activity-heading strong,
+  .general-activity-heading small {
+    display: block;
+  }
+
+  .general-activity-heading strong {
+    font-size: 9px;
+  }
+
+  .general-activity-heading small {
+    margin-top: 2px;
+    color: #62727e;
+    font-size: 7px;
+  }
+
+  .general-activity-count {
+    font-size: 8px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .print-unit-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+  }
+
+  .print-unit-list > span {
+    min-width: 0;
+    padding: 4px 5px;
+    border: 1px solid #dce4e9;
+    border-radius: 3px;
+    background: #fff;
+  }
+
+  .print-unit-list strong,
+  .print-unit-list small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .print-unit-list strong {
+    font-size: 8px;
+  }
+
+  .print-unit-list small {
+    margin-top: 1px;
+    color: #62727e;
+    font-size: 6px;
+  }
+
+  .general-matrix-page {
+    margin-top: 7px;
+  }
+
+  .general-matrix-legend {
+    margin: 6px 0 0;
+    color: #53636f;
+    font-size: 7px;
+    text-align: right;
+  }
+
+  .general-matrix-page-next {
+    break-before: page;
+  }
+
+  .general-matrix-repeat-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    color: #fff;
+    background: #0d3f66;
+  }
+
+  .general-pending-matrix {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 7px;
+  }
+
+  .general-pending-matrix th,
+  .general-pending-matrix td {
+    padding: 3px;
+    border: 1px solid #bfcbd3;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .general-pending-matrix thead th {
+    color: #17212a;
+    background: #dfeaf1;
+  }
+
+  .general-pending-matrix thead th:first-child,
+  .general-pending-matrix tbody th {
+    width: 205px;
+    text-align: left;
+  }
+
+  .general-pending-matrix thead th:nth-child(2),
+  .general-pending-matrix .matrix-time {
+    width: 48px;
+    white-space: nowrap;
+  }
+
+  .general-pending-matrix thead th:nth-child(n + 3) {
+    width: calc((100% - 253px) / 8);
+  }
+
+  .general-pending-matrix th strong,
+  .general-pending-matrix th small {
+    display: block;
+  }
+
+  .general-pending-matrix thead th strong {
+    font-size: 8px;
+  }
+
+  .general-pending-matrix thead th small {
+    margin-top: 2px;
+    overflow: hidden;
+    color: #53636f;
+    font-size: 5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .general-pending-matrix tbody th strong {
+    font-size: 7px;
+  }
+
+  .general-pending-matrix tbody th small {
+    margin-top: 1px;
+    color: #62727e;
+    font-size: 6px;
+  }
+
+  .general-pending-matrix .matrix-pending {
+    background: #fff7df;
+  }
+
+  .general-pending-matrix .matrix-done {
+    color: #0d3f66;
+    background: #e6f1f8;
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .general-pending-matrix .print-checkbox {
+    width: 11px;
+    height: 11px;
+  }
+
+  .assembly-print-report {
+    font-size: 7px;
+  }
+
+  .assembly-print-unit {
+    break-before: page;
+  }
+
+  .assembly-print-unit:first-child {
+    break-before: auto;
+  }
+
+  .assembly-print-header {
+    display: grid;
+    grid-template-columns: 125px minmax(0, 1fr) 90px;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 7px;
+    border-bottom: 2px solid #17212a;
+  }
+
+  .assembly-print-header img {
+    width: 118px;
+    height: 43px;
+    object-fit: contain;
+  }
+
+  .assembly-print-header h1,
+  .assembly-print-header p {
+    margin: 0;
+    text-align: center;
+  }
+
+  .assembly-print-header h1 {
+    font-size: 15px;
+    text-transform: uppercase;
+  }
+
+  .assembly-print-header p {
+    margin-top: 2px;
+    color: #53636f;
+    font-size: 7px;
+  }
+
+  .assembly-print-progress {
+    display: grid;
+    justify-items: end;
+  }
+
+  .assembly-print-progress strong {
+    font-size: 13px;
+  }
+
+  .assembly-print-progress span {
+    color: #53636f;
+    font-size: 6px;
+    text-transform: uppercase;
+  }
+
+  .assembly-print-identity,
+  .assembly-print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .assembly-print-identity {
+    margin-top: 7px;
+  }
+
+  .assembly-print-identity th,
+  .assembly-print-identity td,
+  .assembly-print-table th,
+  .assembly-print-table td {
+    border: 1px solid #17212a;
+  }
+
+  .assembly-print-identity th,
+  .assembly-print-identity td {
+    padding: 3px 5px;
+    text-align: center;
+  }
+
+  .assembly-print-identity th {
+    background: #d9d9d9;
+    font-size: 6px;
+    text-transform: uppercase;
+  }
+
+  .assembly-print-identity td {
+    font-size: 8px;
+    font-weight: 700;
+  }
+
+  .assembly-print-identity th:first-child,
+  .assembly-print-identity td:first-child {
+    width: 32px;
+  }
+
+  .assembly-print-legend {
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+    margin: 5px 0;
+    color: #53636f;
+    font-size: 6px;
+  }
+
+  .assembly-print-legend i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 3px;
+    border: 1px solid #17212a;
+    vertical-align: middle;
+  }
+
+  .assembly-print-table {
+    table-layout: fixed;
+  }
+
+  .assembly-print-table thead {
+    display: table-header-group;
+  }
+
+  .assembly-print-table tr {
+    break-inside: avoid;
+  }
+
+  .assembly-print-table th,
+  .assembly-print-table td {
+    height: 13px;
+    padding: 1px 3px;
+    vertical-align: middle;
+  }
+
+  .assembly-print-table th {
+    background: #eeeeee;
+    font-size: 6px;
+    text-align: center;
+  }
+
+  .assembly-print-table th:first-child {
+    width: 52%;
+    text-align: left;
+  }
+
+  .assembly-print-table th:nth-child(2) {
+    width: 9%;
+  }
+
+  .assembly-print-table th:nth-child(3) {
+    width: 11%;
+  }
+
+  .assembly-print-table th:nth-child(n + 4) {
+    width: 9.33%;
+  }
+
+  .assembly-print-table td:first-child {
+    font-size: 6px;
+  }
+
+  .assembly-print-table td:not(:first-child) {
+    text-align: center;
+  }
+
+  .assembly-print-check {
+    font-size: 8px;
+    font-weight: 800;
+  }
+
+  .assembly-print-unit-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    padding-top: 4px;
+    border-top: 1px solid #8c989f;
+    color: #53636f;
+    font-size: 6px;
+  }
+
   .print-signatures {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2907,6 +3380,7 @@ button {
 @media (max-width: 1180px) {
   .metrics,
   .finance-dashboard-metrics,
+  .pdf-metrics,
   .process-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3006,6 +3480,7 @@ button {
 @media (max-width: 560px) {
   .metrics,
   .finance-dashboard-metrics,
+  .pdf-metrics,
   .process-summary-strip,
   .process-grid,
   .nav {

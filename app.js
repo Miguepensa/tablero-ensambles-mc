@@ -19,6 +19,7 @@ const VIEWS = [
   { id: "equipos", label: "Equipos", icon: "E" },
   { id: "detalle", label: "Detalle", icon: "U" },
   { id: "captura", label: "Captura", icon: "C" },
+  { id: "pdf", label: "PDF", icon: "P" },
   { id: "horas_general", label: "Horas general", icon: "G" },
   { id: "horas", label: "Horas por VIN", icon: "H" },
   { id: "finanzas", label: "Finanzas", icon: "F" },
@@ -104,6 +105,7 @@ let state = {
   selectedId: null,
   captureProcess: "estructurales",
   captureStatus: "todos",
+  pdfProcess: "estructurales",
   hoursProcess: "estructurales",
   hoursVinQuery: "",
   hoursActivityQuery: "",
@@ -252,6 +254,10 @@ app.addEventListener("click", (event) => {
   if (action === "print-general-pending-activities") {
     printGeneralPendingActivitiesReport();
   }
+
+  if (action === "print-assembly-activities") {
+    printAssemblyActivitiesReport();
+  }
 });
 
 app.addEventListener("input", (event) => {
@@ -283,6 +289,11 @@ app.addEventListener("input", (event) => {
 
   if (target.matches("[data-capture-status]")) {
     state.captureStatus = target.value;
+    render();
+  }
+
+  if (target.matches("[data-pdf-process]")) {
+    state.pdfProcess = target.value;
     render();
   }
 
@@ -677,6 +688,7 @@ function renderKicker(view) {
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
     detalle: "Avance por proceso, cobertura de actividades y datos principales de la unidad.",
     captura: "Registro rapido de actividades por proceso para la unidad seleccionada.",
+    pdf: "Formatos de impresión actualizados con el último avance cargado desde Drive.",
     horas_general: "Horas realizadas y pendientes acumuladas para todas las unidades.",
     horas: "Horas realizadas y pendientes de la unidad seleccionada por VIN.",
     finanzas: `${(state.data.finanzas || []).length} registros financieros vinculados por VIN, almacen y zona. Fuente: ${escapeHtml(state.data.financeSource || "Excel local")}.`,
@@ -691,6 +703,7 @@ function renderCurrentView() {
   if (state.view === "equipos") return renderEquiposView();
   if (state.view === "detalle") return renderDetalleView();
   if (state.view === "captura") return renderCapturaView();
+  if (state.view === "pdf") return renderPdfView();
   if (state.view === "horas_general") return renderHorasGeneralView();
   if (state.view === "horas") return renderHorasView();
   if (state.view === "finanzas") return renderFinanzasView();
@@ -1619,8 +1632,6 @@ function renderCapturaView() {
           </div>
           <div class="capture-header-actions">
             ${renderStatusBadge(equipo.status)}
-            <button class="ghost-button" data-action="print-pending-activities">PDF de la unidad</button>
-            <button class="solid-button" data-action="print-general-pending-activities">PDF general</button>
           </div>
         </div>
         <div class="source-fields">
@@ -1669,6 +1680,183 @@ function renderCapturaView() {
         </div>
       </section>
     </div>
+  `;
+}
+
+function renderPdfView() {
+  const report = buildGeneralPendingActivitiesReport();
+  const selectedGroup = report.groups.find((group) => group.process.id === state.pdfProcess) || report.groups[0];
+  const previewUnits = selectedGroup.pendingUnits.slice(0, 6);
+  const previewActivities = selectedGroup.activities.slice(0, 12);
+
+  return `
+    <section class="panel pdf-control-panel">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Formatos dinámicos</p>
+          <h2 class="panel-title">Control de actividades por ensamble</h2>
+          <p class="panel-subtitle">Los formatos se reconstruyen con el avance más reciente. X indica realizado y una celda vacía indica pendiente.</p>
+        </div>
+        <div class="pdf-actions">
+          <button class="solid-button" data-action="print-assembly-activities">Imprimir ensamble seleccionado</button>
+          <button class="ghost-button" data-action="print-general-pending-activities">Imprimir matriz general</button>
+        </div>
+      </div>
+
+      <div class="pdf-toolbar">
+        <label class="field">
+          <span class="field-label">Ensamble</span>
+          <select class="select" data-pdf-process>
+            ${PROCESS_DEFS.map((process) => `<option value="${process.id}" ${process.id === selectedGroup.process.id ? "selected" : ""}>${escapeHtml(process.name)}</option>`).join("")}
+          </select>
+        </label>
+        <div class="pdf-legend">
+          <span><strong>X</strong> Realizado</span>
+          <span><i></i> Pendiente</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="pdf-metrics" style="margin-top:14px;">
+      ${renderMetric("Grúas cargadas", report.units.toLocaleString("es-MX"), "Incluidas en el formato por ensamble", "terminado")}
+      ${renderMetric("Con pendientes", selectedGroup.pendingUnits.length.toLocaleString("es-MX"), selectedGroup.process.name, selectedGroup.pendingUnits.length ? "correccion" : "terminado")}
+      ${renderMetric("Actividades abiertas", selectedGroup.activities.length.toLocaleString("es-MX"), "Actividades con al menos una grúa pendiente", selectedGroup.activities.length ? "en-proceso" : "terminado")}
+      ${renderMetric("Pendientes totales", selectedGroup.pendingActivities.toLocaleString("es-MX"), "Cruces actividad por grúa", selectedGroup.pendingActivities ? "detenido" : "terminado")}
+    </section>
+
+    <section class="panel pdf-preview-panel" style="margin-top:14px;">
+      <div class="panel-header">
+        <div>
+          <p class="panel-label">Vista previa</p>
+          <h2 class="panel-title">${escapeHtml(selectedGroup.process.name)}</h2>
+          <p class="panel-subtitle">Muestra una parte del formato. La impresión incluye todas las grúas y actividades.</p>
+        </div>
+      </div>
+      ${previewUnits.length && previewActivities.length ? `
+        <div class="table-wrap">
+          <table class="pdf-preview-table">
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>Tiempo</th>
+                ${previewUnits.map((unit) => `<th><strong>${escapeHtml(unit.control)}</strong><small>${escapeHtml(unit.vin || "Sin VIN")}</small></th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${previewActivities.map((activity) => `
+                <tr>
+                  <td>${escapeHtml(activity.name)}</td>
+                  <td class="mono">${formatPrintMinutes(activity.minutes)}</td>
+                  ${previewUnits.map((unit) => {
+                    const isPending = activity.units.some((item) => String(item.control) === String(unit.control));
+                    return `<td class="${isPending ? "preview-pending" : "preview-done"}">${isPending ? "" : "X"}</td>`;
+                  }).join("")}
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty-state compact-empty">Este ensamble no tiene actividades pendientes con la información actual.</div>`}
+    </section>
+  `;
+}
+
+function printAssemblyActivitiesReport() {
+  const process = PROCESS_DEFS.find((item) => item.id === state.pdfProcess) || PROCESS_DEFS[0];
+  const units = [...state.data.equipos]
+    .sort((a, b) => String(a.control || a.id).localeCompare(String(b.control || b.id), "es", { numeric: true }));
+
+  if (!units.length) {
+    state.toast = "No hay grúas cargadas para generar el formato.";
+    render();
+    return;
+  }
+
+  document.querySelector(".print-report")?.remove();
+  document.body.insertAdjacentHTML("beforeend", renderAssemblyActivitiesReport(process, units));
+  const cleanup = () => document.querySelector(".print-report")?.remove();
+  window.addEventListener("afterprint", cleanup, { once: true });
+  requestAnimationFrame(() => window.print());
+}
+
+function renderAssemblyActivitiesReport(process, units) {
+  const generatedAt = new Date().toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `
+    <main class="print-report assembly-print-report">
+      <style>@media print { @page { size: A4 portrait; margin: 7mm; } }</style>
+      ${units.map((equipo, unitIndex) => {
+        const activities = getCaptureActivities(equipo.id, process);
+        const completed = activities.filter((activity) => activity.state === "hecho").length;
+        return `
+          <section class="assembly-print-unit">
+            <header class="assembly-print-header">
+              <img src="assets/ehmc-logo.png" alt="Equipos Hidromecánicos MC" />
+              <div>
+                <h1>${escapeHtml(process.name)}</h1>
+                <p>Control de actividades de ensamble</p>
+              </div>
+              <div class="assembly-print-progress">
+                <strong>${completed} / ${activities.length}</strong>
+                <span>realizadas</span>
+              </div>
+            </header>
+
+            <table class="assembly-print-identity">
+              <thead><tr><th>N°</th><th>N° almacén</th><th>VIN</th><th>División</th></tr></thead>
+              <tbody><tr>
+                <td>${unitIndex + 1}</td>
+                <td>${escapeHtml(equipo.control || equipo.id)}</td>
+                <td>${escapeHtml(equipo.vin || "-")}</td>
+                <td>${escapeHtml(equipo.division || "-")}</td>
+              </tr></tbody>
+            </table>
+
+            <div class="assembly-print-legend">
+              <span><strong>X</strong> Ya realizado</span>
+              <span><i></i> Pendiente de registro</span>
+              <span>Actualizado: ${escapeHtml(generatedAt)}</span>
+            </div>
+
+            <table class="assembly-print-table">
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th>Tiempo</th>
+                  <th>Proceso realizado</th>
+                  <th>Capturó</th>
+                  <th>Revisó</th>
+                  <th>Firma</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${activities.map((activity) => `
+                  <tr>
+                    <td>${escapeHtml(activity.name)}</td>
+                    <td>${formatPrintMinutes(activity.minutes)}</td>
+                    <td class="assembly-print-check">${activity.state === "hecho" ? "X" : ""}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <footer class="assembly-print-unit-footer">
+              <span>${escapeHtml(process.name)} · ${escapeHtml(equipo.control || equipo.id)}</span>
+              <span>Hoja ${unitIndex + 1} de ${units.length}</span>
+            </footer>
+          </section>
+        `;
+      }).join("")}
+    </main>
   `;
 }
 
@@ -1815,11 +2003,27 @@ function buildGeneralPendingActivitiesReport() {
           minutes: Number(activity.minutes) || 0,
           pending: 0,
           corrections: 0,
+          units: [],
         };
         current.pending += 1;
         if (activity.state === "correccion") current.corrections += 1;
+        current.units.push({
+          control: equipo.control || equipo.id,
+          vin: equipo.vin || "",
+          division: equipo.division || "",
+        });
         activityMap.set(key, current);
       });
+    });
+
+    const activities = [...activityMap.values()]
+      .map((activity) => ({
+        ...activity,
+        units: activity.units.sort((a, b) => String(a.control).localeCompare(String(b.control), "es", { numeric: true })),
+      }));
+    const pendingUnitMap = new Map();
+    activities.forEach((activity) => {
+      activity.units.forEach((unit) => pendingUnitMap.set(String(unit.control), unit));
     });
 
     return {
@@ -1829,7 +2033,9 @@ function buildGeneralPendingActivitiesReport() {
       pendingActivities,
       corrections,
       percent: totalActivities > 0 ? ((totalActivities - pendingActivities) / totalActivities) * 100 : 0,
-      activities: [...activityMap.values()].sort((a, b) => b.pending - a.pending || a.name.localeCompare(b.name, "es")),
+      activities,
+      pendingUnits: [...pendingUnitMap.values()]
+        .sort((a, b) => String(a.control).localeCompare(String(b.control), "es", { numeric: true })),
     };
   });
 
@@ -1853,6 +2059,7 @@ function renderGeneralPendingActivitiesReport(report) {
 
   return `
     <main class="print-report general-print-report">
+      <style>@media print { @page { size: A4 landscape; margin: 8mm; } }</style>
       <header class="print-report-header">
         <div>
           <p>Tablero Ensambles MC</p>
@@ -1894,30 +2101,49 @@ function renderGeneralPendingActivitiesReport(report) {
         <section class="print-report-group general-process-group">
           <div class="print-report-group-title">
             <h2>${escapeHtml(group.process.name)}</h2>
-            <span>Faltan ${group.pendingActivities.toLocaleString("es-MX")} para llegar al 100%</span>
+            <span>${group.pendingUnits.length.toLocaleString("es-MX")} grúas con pendientes · ${group.pendingActivities.toLocaleString("es-MX")} actividades por atender</span>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Actividad</th>
-                <th>Subproceso</th>
-                <th>Grúas pendientes</th>
-                <th class="print-check-heading">Hecho</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${group.activities.map((activity, index) => `
-                <tr>
-                  <td>${index + 1}</td>
-                  <td>${escapeHtml(activity.name)}</td>
-                  <td>${escapeHtml(activity.subprocess)}</td>
-                  <td>${activity.pending.toLocaleString("es-MX")}</td>
-                  <td class="print-check-cell"><span class="print-checkbox" aria-hidden="true"></span></td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
+          <p class="general-matrix-legend"><strong>X</strong> realizado · celda vacía pendiente</p>
+          ${chunkReportItems(group.pendingUnits, 8).map((unitChunk, chunkIndex) => `
+            <article class="general-matrix-page ${chunkIndex > 0 ? "general-matrix-page-next" : ""}">
+              ${chunkIndex > 0 ? `
+                <div class="general-matrix-repeat-title">
+                  <strong>${escapeHtml(group.process.name)}</strong>
+                  <span>Continuación · grúas ${chunkIndex * 8 + 1} a ${chunkIndex * 8 + unitChunk.length}</span>
+                </div>
+              ` : ""}
+              <table class="general-pending-matrix">
+                <thead>
+                  <tr>
+                    <th>Proceso / actividad</th>
+                    <th>Tiempo</th>
+                    ${unitChunk.map((unit) => `
+                      <th>
+                        <strong>${escapeHtml(unit.control)}</strong>
+                        <small>${escapeHtml(unit.vin || "Sin VIN")}</small>
+                        <small>${escapeHtml(unit.division || "")}</small>
+                      </th>
+                    `).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${group.activities.map((activity) => `
+                    <tr>
+                      <th>
+                        <strong>${escapeHtml(activity.name)}</strong>
+                        <small>${escapeHtml(activity.subprocess)}</small>
+                      </th>
+                      <td class="matrix-time">${formatPrintMinutes(activity.minutes)}</td>
+                      ${unitChunk.map((unit) => {
+                        const isPending = activity.units.some((item) => String(item.control) === String(unit.control));
+                        return `<td class="${isPending ? "matrix-pending" : "matrix-done"}">${isPending ? "" : "X"}</td>`;
+                      }).join("")}
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </article>
+          `).join("")}
         </section>
       `).join("")}
 
@@ -1929,6 +2155,14 @@ function renderGeneralPendingActivitiesReport(report) {
       </footer>
     </main>
   `;
+}
+
+function chunkReportItems(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function formatPrintMinutes(minutes) {
