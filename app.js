@@ -1698,7 +1698,7 @@ function renderPdfView() {
           <p class="panel-subtitle">Los formatos se reconstruyen con el avance más reciente. X indica realizado y una celda vacía indica pendiente.</p>
         </div>
         <div class="pdf-actions">
-          <button class="solid-button" data-action="print-assembly-activities">Imprimir ensamble seleccionado</button>
+          <button class="solid-button" data-action="print-assembly-activities">Imprimir grúas con pendientes</button>
           <button class="ghost-button" data-action="print-general-pending-activities">Imprimir matriz general</button>
         </div>
       </div>
@@ -1729,7 +1729,7 @@ function renderPdfView() {
         <div>
           <p class="panel-label">Vista previa</p>
           <h2 class="panel-title">${escapeHtml(selectedGroup.process.name)}</h2>
-          <p class="panel-subtitle">Muestra una parte del formato. La impresión incluye todas las grúas y actividades.</p>
+          <p class="panel-subtitle">Muestra una parte del formato. La impresión incluye únicamente las grúas con pendientes y todas sus actividades.</p>
         </div>
       </div>
       ${previewUnits.length && previewActivities.length ? `
@@ -1763,23 +1763,29 @@ function renderPdfView() {
 
 function printAssemblyActivitiesReport() {
   const process = PROCESS_DEFS.find((item) => item.id === state.pdfProcess) || PROCESS_DEFS[0];
-  const units = [...state.data.equipos]
-    .sort((a, b) => String(a.control || a.id).localeCompare(String(b.control || b.id), "es", { numeric: true }));
+  const unitReports = [...state.data.equipos]
+    .sort((a, b) => String(a.control || a.id).localeCompare(String(b.control || b.id), "es", { numeric: true }))
+    .map((equipo) => {
+      const activities = getCaptureActivities(equipo.id, process);
+      const completed = activities.filter((activity) => activity.state === "hecho").length;
+      return { equipo, activities, completed };
+    })
+    .filter(({ activities, completed }) => activities.length > completed);
 
-  if (!units.length) {
-    state.toast = "No hay grúas cargadas para generar el formato.";
+  if (!unitReports.length) {
+    state.toast = "Este ensamble no tiene grúas con actividades pendientes.";
     render();
     return;
   }
 
   document.querySelector(".print-report")?.remove();
-  document.body.insertAdjacentHTML("beforeend", renderAssemblyActivitiesReport(process, units));
+  document.body.insertAdjacentHTML("beforeend", renderAssemblyActivitiesReport(process, unitReports));
   const cleanup = () => document.querySelector(".print-report")?.remove();
   window.addEventListener("afterprint", cleanup, { once: true });
   requestAnimationFrame(() => window.print());
 }
 
-function renderAssemblyActivitiesReport(process, units) {
+function renderAssemblyActivitiesReport(process, unitReports) {
   const generatedAt = new Date().toLocaleString("es-MX", {
     day: "2-digit",
     month: "long",
@@ -1791,9 +1797,7 @@ function renderAssemblyActivitiesReport(process, units) {
   return `
     <main class="print-report assembly-print-report">
       <style>@media print { @page { size: A4 portrait; margin: 7mm; } }</style>
-      ${units.map((equipo, unitIndex) => {
-        const activities = getCaptureActivities(equipo.id, process);
-        const completed = activities.filter((activity) => activity.state === "hecho").length;
+      ${unitReports.map(({ equipo, activities, completed }, unitIndex) => {
         return `
           <section class="assembly-print-unit">
             <header class="assembly-print-header">
@@ -1851,7 +1855,7 @@ function renderAssemblyActivitiesReport(process, units) {
 
             <footer class="assembly-print-unit-footer">
               <span>${escapeHtml(process.name)} · ${escapeHtml(equipo.control || equipo.id)}</span>
-              <span>Hoja ${unitIndex + 1} de ${units.length}</span>
+              <span>Hoja ${unitIndex + 1} de ${unitReports.length}</span>
             </footer>
           </section>
         `;
