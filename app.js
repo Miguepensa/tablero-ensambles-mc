@@ -67,6 +67,7 @@ const DAILY_CUTOFF_MINUTE = 55;
 const INITIAL_BALANCE_DATE = "2026-10-02";
 let initialBalances = {};
 let recoveredDailyHistory = { processes: {} };
+let historicalCuts = { processes: {} };
 let driveLoadInFlight = false;
 const PROJECT_TOTAL_AMOUNT = 608197933;
 const STRUCTURAL_ACTIVITY_TIMES = [
@@ -371,6 +372,13 @@ async function bootstrapData() {
     const response = await fetch("data/recovered-daily-history.json", { cache: "no-store" });
     if (!response.ok) throw new Error("No se pudo cargar el historial recuperado");
     recoveredDailyHistory = await response.json();
+  } catch (error) {
+    state.historyError = error.message;
+  }
+  try {
+    const response = await fetch("data/historical-cuts.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("No se pudieron cargar los cortes de Excel");
+    historicalCuts = await response.json();
   } catch (error) {
     state.historyError = error.message;
   }
@@ -857,7 +865,7 @@ function renderOperationalControlCard(item, index = 0) {
 
       <div class="operation-output-grid">
         <div><span>Meta diaria</span><strong class="mono">${dailyTarget}/dia</strong></div>
-        <div><span>Producción diaria</span><strong class="mono">${operationalDaily}/dia</strong></div>
+        <div><span>Promedio diario desde el saldo</span><strong class="mono">${operationalDaily}/dia</strong></div>
         <div><span>Capacidad diaria</span><strong class="mono">${dailyCapacity}/dia</strong></div>
         <div><span>Saldo inicial</span><strong class="mono">${formatWorkDuration(item.planningPendingMinutes)}</strong></div>
         <div><span>Saldo actual</span><strong class="mono">${formatWorkDuration(item.currentPendingMinutes)}</strong></div>
@@ -883,15 +891,17 @@ function renderOperationalControlCard(item, index = 0) {
 }
 
 function renderDailyProductionIndicators(item) {
-  const days = getPlanningWorkdayDates(item);
+  const plannedDays = getPlanningWorkdayDates(item);
+  const archivedDates = Object.keys(historicalCuts.processes?.[item.id] || {});
+  const days = [...new Set([...plannedDays.map(localDateKey), ...archivedDates])].sort().map(parseIsoLocalDate);
   if (!days.length) return "";
   const history = loadDailyProductionHistory();
   const processHistory = history.processes?.[item.id] || {};
   const todayKey = projectDateKey(new Date());
-  const todayRecord = processHistory[todayKey];
+  const todayRecord = Object.values(processHistory).filter(record => record.dailyValid || record.baselineOnly).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt))[0];
   const cutoffLabel = todayRecord?.observedAt
-    ? `Ultimo corte: ${formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
-    : "Sin corte registrado hoy";
+    ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
+    : "Sin corte válido registrado";
 
   return `
     <div class="daily-production">
@@ -910,7 +920,7 @@ function renderDailyProductionIndicators(item) {
       <div class="daily-production-grid">
         ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Historial recuperado del 02 al 07/10/2026. Los días sin cortes válidos muestran “Sin dato”. Los nuevos cortes siguen guardándose en este navegador hasta contar con un historial central.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 06/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }
@@ -920,7 +930,7 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
   const record = processHistory[dateKey];
   const isFuture = dateKey > todayKey;
   const productionMinutes = record && record.dailyValid !== false
-    ? Number.isFinite(record.startPendingMinutes) ? Math.max(record.startPendingMinutes - Number(record.latestPendingMinutes), 0) : null
+    ? Number.isFinite(record.productionMinutes) ? record.productionMinutes : Number.isFinite(record.startPendingMinutes) ? Math.max(record.startPendingMinutes - Number(record.latestPendingMinutes), 0) : null
     : null;
   const percent = productionMinutes !== null && Number.isFinite(targetMinutes) && targetMinutes > 0
     ? (productionMinutes / targetMinutes) * 100
@@ -936,20 +946,24 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
           : "red";
   const statusText = isFuture
     ? "Pendiente"
-    : percent === null
+    : record?.baselineOnly ? "Base" : percent === null
       ? "Sin dato"
       : `${Math.round(percent)}%`;
   const weekday = date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "").slice(0, 3);
   const detail = `${weekday} ${formatShortDate(date)} · ${statusText} · ${productionMinutes === null ? "sin lectura" : `${formatWorkDuration(productionMinutes)} producidas`}`;
+  const intervalDetail = record?.periodStart
+    ? ' · Desde ' + projectDateKey(record.periodStart) + ' ' + formatCutoffTime(record.periodStart) + ' hasta ' + projectDateKey(record.observedAt) + ' ' + formatCutoffTime(record.observedAt) + '. Avance entre cortes, no jornada completa.' + (record.pendingAdjustmentMinutes ? ' Ajuste de pendientes por cambios del listado: ' + record.pendingAdjustmentMinutes + ' min; excluido de producción.' : '')
+    : '';
   const cutoffDetail = record?.observedAt
     ? ` · lectura ${projectDateKey(record.observedAt)} ${formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})${record.validationNote ? " · " + record.validationNote : ""}`
     : "";
 
   return `
-    <div class="daily-production-day ${status} ${dateKey === todayKey ? "today" : ""}" title="${escapeAttr(detail + cutoffDetail)}" aria-label="${escapeAttr(detail + cutoffDetail)}">
+    <div class="daily-production-day ${status} ${dateKey === todayKey ? "today" : ""}" title="${escapeAttr(detail + cutoffDetail + intervalDetail)}" aria-label="${escapeAttr(detail + cutoffDetail + intervalDetail)}">
       <span>${escapeHtml(weekday)} ${date.getDate()}/${date.getMonth() + 1}</span>
       <strong>${statusText}</strong>
       <small>${productionMinutes === null || isFuture ? "—" : formatWorkDuration(productionMinutes)}</small>
+      ${record?.snapshotType === "historical-file" ? `<small>Corte ${formatCutoffTime(record.observedAt)}</small><small>${record.baselineOnly ? "Saldo inicial" : "Entre cortes"}</small>` : ""}
     </div>
   `;
 }
@@ -991,7 +1005,7 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
       observedAt: new Date().toISOString(),
       snapshotType,
       dateValid: true,
-      dailyValid: Number.isFinite(startPendingMinutes),
+      dailyValid: Number.isFinite(startPendingMinutes) && priorRecord?.snapshotType !== "historical-file",
       intervalValidated: true,
     };
     history.processes[item.id] = processHistory;
@@ -1016,13 +1030,17 @@ function loadDailyProductionHistory() {
       if (projectDateKey(record.observedAt) !== date) continue;
       if (!records[date] || Date.parse(record.observedAt) > Date.parse(records[date].observedAt)) records[date] = record;
     }
+    // Archived workbook cuts are shared evidence and always take precedence over browser caches.
+    Object.assign(records, historicalCuts.processes?.[process.id] || {});
     for (const [date, record] of Object.entries(records)) {
       const dateValid = projectDateKey(record.observedAt) === date;
       const previousDate = parseIsoLocalDate(date);
       previousDate.setDate(previousDate.getDate() - 1);
       const previousKey = localDateKey(previousDate);
       const previous = records[previousKey];
-      const consecutive = previous && projectDateKey(previous.observedAt) === previousKey;
+      const consecutive = previous && projectDateKey(previous.observedAt) === previousKey
+        && previous.snapshotType !== "historical-file"
+        && record.startPendingMinutes === previous.latestPendingMinutes;
       const dailyValid = dateValid && Number.isFinite(record.startPendingMinutes)
         && Number.isFinite(record.latestPendingMinutes)
         && (record.intervalValidated ? record.dailyValid : Boolean(consecutive));
@@ -1054,6 +1072,7 @@ function formatCutoffTime(value) {
 }
 
 function snapshotTypeLabel(value) {
+  if (value === "historical-file") return "versión de Excel";
   if (value === "manual") return "actualizacion manual";
   if (value === "daily-cutoff") return "corte automatico";
   if (value === "cached") return "ultima lectura guardada";
@@ -1399,7 +1418,7 @@ function renderPlanningRow(item) {
         </div>
         <div class="planning-daily-output">
           <span>Meta diaria<strong class="mono">${dailyTarget}/dia</strong></span>
-          <span>Producción diaria<strong class="mono">${operationalDaily}/dia</strong></span>
+          <span>Promedio diario desde el saldo<strong class="mono">${operationalDaily}/dia</strong></span>
           <span>Capacidad diaria<strong class="mono">${dailyCapacity}/dia</strong></span>
         </div>
         <div class="planning-compliance ${item.status}">

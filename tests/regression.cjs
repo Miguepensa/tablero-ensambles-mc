@@ -89,6 +89,32 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.equal(stored.processes.estructurales[today].latestPendingMinutes, 8000);
   if (today !== '2026-10-04') assert.equal(stored.processes.estructurales['2026-10-04'].observedAt, '2026-10-07T14:33:48.807Z');
 
+  // Historical cuts override browser records and count activity transitions, not roster changes.
+  context.archiveFixture = JSON.parse(fs.readFileSync(path.join(root, 'data/historical-cuts.json'), 'utf8'));
+  run('historicalCuts = archiveFixture');
+  const archived = json('loadDailyProductionHistory()');
+  assert.equal(archived.processes.electrico['2026-10-03'].productionMinutes, 680);
+  assert.equal(archived.processes.electrico['2026-10-05'].productionMinutes, 745);
+  assert.equal(archived.processes.estructurales['2026-10-05'].productionMinutes, 0);
+  assert.equal(archived.processes.estructurales['2026-10-05'].pendingAdjustmentMinutes, 240);
+  assert.equal(archived.processes.talleres['2026-10-06'].productionMinutes, 2045);
+  assert.equal(archived.processes.electrico['2026-10-02'].dailyValid, false);
+  assert.equal(archived.processes.electrico['2026-10-07'].dailyValid, false);
+  for (const records of Object.values(context.archiveFixture.processes)) {
+    for (const [date, record] of Object.entries(records)) {
+      if (date === '2026-10-02') continue;
+      assert.equal(record.startPendingMinutes - record.productionMinutes + record.pendingAdjustmentMinutes, record.latestPendingMinutes);
+      assert.equal(record.reopenedActivities, 0);
+    }
+  }
+  const archiveCell = run('renderDailyProductionDay(parseIsoLocalDate("2026-10-05"),"2026-10-07",loadDailyProductionHistory().processes.electrico,100)');
+  assert.match(archiveCell, /12 h 25 min/);
+  assert.match(archiveCell, /Corte 21:35/);
+  assert.match(archiveCell, /Entre cortes/);
+  assert.match(run('renderDailyProductionDay(parseIsoLocalDate("2026-10-02"),"2026-10-07",loadDailyProductionHistory().processes.electrico,100)'), /Base/);
+  storage.set('tablero-ensambles-produccion-diaria-v1', JSON.stringify({processes:{electrico:{'2026-10-03':{observedAt:'2026-10-03T23:59:00-06:00',startPendingMinutes:1,latestPendingMinutes:0}}}}));
+  assert.equal(json('loadDailyProductionHistory()').processes.electrico['2026-10-03'].productionMinutes, 680);
+
   // Failure must preserve the previous complete dataset and must not record a cutoff.
   run(`render = () => {}; recordDailyProductionSnapshot = () => { throw new Error('Should not write a snapshot on failure'); };
     loadPublicSourceConfig = async () => ({avance:'https://example.org/current.csv',processSheets:{}});
@@ -101,4 +127,3 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.equal(run('state.loading'), false);
   console.log('PASS: saldo inmutable, meta fija, ausencia de históricos, identidad duplicada, contadores, JSONP, semáforo y fallo de sincronización.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
-

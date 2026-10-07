@@ -155,3 +155,12 @@ En `Captura`, los nombres de actividades salen de la fila de encabezados de cada
 ## Nota de acceso
 
 Un archivo privado de Drive no puede leerse desde esta app estatica sin autenticacion. Para datos reales usa CSV publicado, permiso publico con enlace, o un proxy/API de Google Apps Script.
+
+
+## Cortes históricos recuperados en octubre de 2026
+
+`data/historical-cuts.json` conserva los cortes XLSX del 2 (17:08), 3 (20:04), 4 (21:11), 5 (21:35) y 6 (13:00) de octubre, hora de México. Incluye nombres y SHA-256 de las fuentes. El saldo inicial permanece en `data/initial-balances.json`.
+
+La producción histórica cuenta transiciones a hecho de actividades con la misma unidad/VIN, identificador, nombre y duración en ambos cortes, aplicando los tiempos validados del tablero. Las altas/bajas o cambios de identidad se excluyen. `pendingAdjustmentMinutes` concilia cambios del saldo que no son producción comparable. No se distribuyen las horas entre días ni se suponen jornadas completas. El porcentaje usa una meta diaria como referencia. El corte del 2 es base, no producción.
+
+Estos registros prevalecen sobre localStorage. El día 7 requiere otro corte comparable de actividades; un saldo total aislado no permite separar producción de cambios del listado. El histórico recuperado es compartido al publicar estos archivos, pero los nuevos registros de navegador todavía no tienen almacenamiento central.
