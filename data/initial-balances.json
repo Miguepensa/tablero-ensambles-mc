@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-02",
+  "processes": {
+    "estructurales": {
+      "minutes": 9610,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "workdays": 8,
+      "observedAt": "2026-10-03T00:45:17.136Z",
+      "snapshotType": "cached"
+    },
+    "talleres": {
+      "minutes": 18335,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T00:45:17.136Z",
+      "snapshotType": "cached"
+    },
+    "electrico": {
+      "minutes": 17790,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "hidraulico": {
+      "minutes": 11020,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "pedestal": {
+      "minutes": 13905,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "brazos": {
+      "minutes": 38795,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "pruebas_iniciales": {
+      "minutes": 8880,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "acabado_inicial": {
+      "minutes": 28285,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "pintura_detalles": {
+      "minutes": 6395,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "acabado_final": {
+      "minutes": 20800,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    },
+    "calidad_final": {
+      "minutes": 28395,
+      "source": "Historial del navegador del tablero publicado, recuperado por el usuario el 07/10/2026.",
+      "observedAt": "2026-10-03T05:03:33.624Z",
+      "snapshotType": "cached"
+    }
+  }
+}

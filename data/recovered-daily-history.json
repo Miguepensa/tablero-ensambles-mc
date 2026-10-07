@@ -1,0 +1,293 @@
+{
+  "recoveredOn": "2026-10-07",
+  "timezone": "America/Mexico_City",
+  "source": "Historial exportado por el usuario del tablero publicado. Registros originales sin alterar.",
+  "processes": {
+    "estructurales": {
+      "2026-10-02": {
+        "startPendingMinutes": 9610,
+        "latestPendingMinutes": 9610,
+        "observedAt": "2026-10-03T00:45:17.136Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 9610,
+        "latestPendingMinutes": 9610,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 9610,
+        "latestPendingMinutes": 8680,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 8680,
+        "latestPendingMinutes": 8680,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "talleres": {
+      "2026-10-02": {
+        "startPendingMinutes": 18335,
+        "latestPendingMinutes": 18335,
+        "observedAt": "2026-10-03T00:45:17.136Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 18335,
+        "latestPendingMinutes": 18335,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 18335,
+        "latestPendingMinutes": 16810,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 16810,
+        "latestPendingMinutes": 16810,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "electrico": {
+      "2026-10-02": {
+        "startPendingMinutes": 17790,
+        "latestPendingMinutes": 17790,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 17790,
+        "latestPendingMinutes": 17790,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 17790,
+        "latestPendingMinutes": 15930,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 15930,
+        "latestPendingMinutes": 15930,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "hidraulico": {
+      "2026-10-02": {
+        "startPendingMinutes": 11020,
+        "latestPendingMinutes": 11020,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 11020,
+        "latestPendingMinutes": 11020,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 11020,
+        "latestPendingMinutes": 11020,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 11020,
+        "latestPendingMinutes": 11020,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "pedestal": {
+      "2026-10-02": {
+        "startPendingMinutes": 13905,
+        "latestPendingMinutes": 13905,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 13905,
+        "latestPendingMinutes": 13905,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 13905,
+        "latestPendingMinutes": 13905,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 13905,
+        "latestPendingMinutes": 13905,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "brazos": {
+      "2026-10-02": {
+        "startPendingMinutes": 38795,
+        "latestPendingMinutes": 38795,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 38795,
+        "latestPendingMinutes": 38795,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 38795,
+        "latestPendingMinutes": 37355,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 37355,
+        "latestPendingMinutes": 37355,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "pruebas_iniciales": {
+      "2026-10-02": {
+        "startPendingMinutes": 8880,
+        "latestPendingMinutes": 8880,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 8880,
+        "latestPendingMinutes": 8880,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 8880,
+        "latestPendingMinutes": 8880,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 8880,
+        "latestPendingMinutes": 8880,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "acabado_inicial": {
+      "2026-10-02": {
+        "startPendingMinutes": 28285,
+        "latestPendingMinutes": 28285,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 28285,
+        "latestPendingMinutes": 28285,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 28285,
+        "latestPendingMinutes": 27865,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 27865,
+        "latestPendingMinutes": 27865,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "pintura_detalles": {
+      "2026-10-02": {
+        "startPendingMinutes": 6395,
+        "latestPendingMinutes": 6395,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 6395,
+        "latestPendingMinutes": 6395,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 6395,
+        "latestPendingMinutes": 6395,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 6395,
+        "latestPendingMinutes": 6395,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "acabado_final": {
+      "2026-10-02": {
+        "startPendingMinutes": 20800,
+        "latestPendingMinutes": 20800,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 20800,
+        "latestPendingMinutes": 20800,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 20800,
+        "latestPendingMinutes": 20560,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 20560,
+        "latestPendingMinutes": 20560,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    },
+    "calidad_final": {
+      "2026-10-02": {
+        "startPendingMinutes": 28395,
+        "latestPendingMinutes": 28395,
+        "observedAt": "2026-10-03T05:03:33.624Z",
+        "snapshotType": "cached"
+      },
+      "2026-10-03": {
+        "startPendingMinutes": 28395,
+        "latestPendingMinutes": 28395,
+        "observedAt": "2026-10-03T16:24:23.526Z",
+        "snapshotType": "manual"
+      },
+      "2026-10-04": {
+        "startPendingMinutes": 28395,
+        "latestPendingMinutes": 28395,
+        "observedAt": "2026-10-07T14:33:48.807Z",
+        "snapshotType": "daily-cutoff"
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 28395,
+        "latestPendingMinutes": 26975,
+        "observedAt": "2026-10-07T19:31:37.863Z",
+        "snapshotType": "manual"
+      }
+    }
+  }
+}

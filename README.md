@@ -1,5 +1,17 @@
 # Tablero Ensambles MC
 
+## Revisión local del 07/10/2026
+
+- La lectura operativa usa `data/sources.json` como configuración compartida. Al abrir y actualizar se consulta Drive; no se restaura la caché del dispositivo ni se mezclan hojas fallidas con lecturas anteriores. Los enlaces de Conexión son informativos y de solo lectura.
+- Cada lectura completa muestra hora (Ciudad de México) e identificador del contenido para comparar equipos. Si falla alguna hoja configurada, se conserva la última lectura completa y se muestra el error. La publicación CSV de Google puede tener su propio retraso; el identificador compara contenido recibido, no garantiza instantaneidad del archivo privado.
+- `data/initial-balances.json` guarda la línea base inmutable del 02/10/2026. Los once saldos se recuperaron del historial exportado por el usuario del navegador productivo, conservando fecha, tipo de lectura y procedencia. Estructural conserva además su meta original de 8 días. Nunca se reemplazan por horas actuales ni por celdas vacías.
+- La fila 134 de avance es la grúa siniestrada. Comparte almacén y VIN con la fila 180. Se mantienen identidades distintas; en las hojas de proceso se relaciona la primera y segunda aparición del par duplicado, porque también repiten división. Si Drive cambia ese orden, se debe agregar una clave única por unidad en origen.
+- El semáforo muestra fecha, porcentaje y horas. El archivo `data/recovered-daily-history.json` conserva los 44 registros originales del historial recuperado y se carga en todos los navegadores. Los cortes etiquetados 04/10 pero observados el 07/10 se conservan y se excluyen del cálculo diario; el 07/10 carece del corte del 06/10. Los nuevos cortes siguen siendo locales; un navegador reanudado nunca registra una lectura nueva bajo una fecha pasada. Compartir el historial diario requiere almacenamiento central; no está resuelto por actualizar el CSV actual.
+- Validación: `node --check app.js` y `node tests/regression.cjs`. Se verificaron tres perfiles de navegador con cachés y configuraciones antiguas diferentes: mismo contenido, 171 unidades, 99 terminadas, 71 en proceso y 1 siniestrada.
+
+Las instrucciones de conexión manual de las secciones siguientes describen el flujo anterior; esta revisión utiliza las fuentes compartidas.
+
+
 App web estatica para visualizar el avance de ensamble EH150 usando datos demo, CSV locales o URLs CSV publicadas desde Google Drive / Google Sheets.
 
 ## Abrir

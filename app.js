@@ -27,6 +27,7 @@ const VIEWS = [
 ];
 
 const STATUS = {
+  siniestrado: { label: "Siniestrado", className: "siniestrado", color: "#8b4052" },
   terminado: { label: "Terminado", className: "terminado", color: "#2aa96b" },
   en_proceso: { label: "En proceso", className: "en-proceso", color: "#1f78b8" },
   detenido: { label: "Detenido", className: "detenido", color: "#d63c32" },
@@ -64,6 +65,9 @@ const DEFAULT_AUTO_REFRESH_MINUTES = 5;
 const DAILY_CUTOFF_HOUR = 23;
 const DAILY_CUTOFF_MINUTE = 55;
 const INITIAL_BALANCE_DATE = "2026-10-02";
+let initialBalances = {};
+let recoveredDailyHistory = { processes: {} };
+let driveLoadInFlight = false;
 const PROJECT_TOTAL_AMOUNT = 608197933;
 const STRUCTURAL_ACTIVITY_TIMES = [
   { name: "Barrenar angulos de defensa", minutes: 30 },
@@ -211,7 +215,7 @@ app.addEventListener("click", (event) => {
   if (action === "load-finance-drive") {
     state.config = readConfigFromDom();
     saveConfig(state.config);
-    loadFinanceDrive();
+    loadDriveData({ keepView: true });
   }
 
   if (action === "apply-bulk-sources") {
@@ -355,66 +359,49 @@ app.addEventListener("change", (event) => {
 });
 
 async function bootstrapData() {
-  const [publicConfig, cachedRecord] = await Promise.all([
-    loadPublicSourceConfig(),
-    loadCachedDataset(),
-  ]);
-
-  const hasCachedData = Boolean(cachedRecord?.data?.equipos?.length);
-
-  if (hasCachedData) {
-    state.data = normalizeDataset(cachedRecord.data);
-    recordDailyProductionSnapshot("cached");
-    state.selectedId = state.data.equipos[0]?.id || null;
-    state.toast = "Mostrando la ultima informacion guardada.";
-    render();
+  try {
+    const response = await fetch("data/initial-balances.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("No se pudo leer el saldo inicial");
+    const baseline = await response.json();
+    if (baseline.date === INITIAL_BALANCE_DATE) initialBalances = baseline.processes || {};
+  } catch (error) {
+    state.toast = error.message;
   }
-
-  if (publicConfig) {
-    state.config = mergeSourceConfigs(publicConfig, state.config);
+  try {
+    const response = await fetch("data/recovered-daily-history.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("No se pudo cargar el historial recuperado");
+    recoveredDailyHistory = await response.json();
+  } catch (error) {
+    state.historyError = error.message;
   }
-
-  await loadBundledAdvanceData();
-
-  if (hasConfiguredSources(state.config)) {
-    const cacheIsFresh = hasCachedData && isCachedDatasetFresh(
-      cachedRecord,
-      state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES,
-      state.config,
-    );
-
-    if (cacheIsFresh) {
-      state.toast = "Informacion guardada al dia. Drive se actualizara automaticamente.";
-      render();
-    } else {
-      await loadDriveData({
-        background: hasCachedData,
-        keepView: true,
-        mergeWithCurrent: true,
-      });
-    }
-    startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
-    return;
-  }
+  // Siempre consultar Drive. Ni el cache ni los CSV históricos son lecturas actuales.
+  await loadDriveData({ keepView: true, snapshotType: "automatic" });
+  startAutoRefresh(state.config.autoRefreshMinutes || DEFAULT_AUTO_REFRESH_MINUTES);
 }
 
 async function loadDriveData(options = {}) {
-  const { background = false, keepView = false, mergeWithCurrent = true } = options;
+  if (driveLoadInFlight) return;
+  driveLoadInFlight = true;
+  const { background = false, keepView = false } = options;
   const snapshotType = options.snapshotType || (background ? "automatic" : "manual");
   const snapshotDateKey = options.snapshotDateKey || "";
   const previousView = state.view;
   const previousSelectedId = state.selectedId;
-  state.loading = !background;
+  state.loading = true;
   if (!background) {
     state.toast = "Cargando datos desde Drive...";
     render();
   }
 
   try {
-    const imported = await buildDatasetFromConfig(state.config, mergeWithCurrent ? state.data : createEmptyDataset());
+    const publicConfig = await loadPublicSourceConfig();
+    if (!publicConfig || !hasConfiguredSources(publicConfig)) throw new Error("No se pudo leer la configuración compartida de Drive.");
+    state.config = publicConfig;
+    const imported = await buildDatasetFromConfig(publicConfig, createEmptyDataset());
     state.data = imported;
+    state.syncError = "";
     recordDailyProductionSnapshot(snapshotType, snapshotDateKey);
-    await saveCachedDataset(imported, state.config);
+    // Current data is never restored from device-local cache.
     state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
       ? previousSelectedId
       : imported.equipos[0]?.id || null;
@@ -423,8 +410,10 @@ async function loadDriveData(options = {}) {
       ? `Datos actualizados con avisos: ${imported.loadErrors.join(" / ")}`
       : `${background ? "Actualizacion automatica" : "Datos actualizados"}: ${imported.equipos.length} equipos.`;
   } catch (error) {
-    state.toast = `No se pudieron cargar los CSV: ${error.message}`;
+    state.syncError = `Lectura de Drive fallida. Se conserva la última lectura completa, sin mezclar datos: ${error.message}`;
+    state.toast = state.syncError;
   } finally {
+    driveLoadInFlight = false;
     state.loading = false;
     render();
   }
@@ -626,6 +615,10 @@ function render() {
             <button class="solid-button" data-action="load-drive" ${state.loading ? "disabled" : ""}>${state.loading ? "Cargando..." : "Actualizar"}</button>
           </div>
         </section>
+        <div class="sync-status ${state.syncError ? "sync-error" : ""}" role="status">
+          ${state.loading ? "Consultando Drive… " : ""}
+          ${state.syncError ? escapeHtml(state.syncError) : state.data.sourceRevision ? `Lectura completa de Drive: ${new Date(state.data.updatedAt).toLocaleString("es-MX", { timeZone: "America/Mexico_City" })} · Datos ${state.data.sourceRevision}` : "Sin lectura actual de Drive"}
+        </div>
         ${renderCurrentView()}
       </main>
     </div>
@@ -724,6 +717,7 @@ function renderDashboardView() {
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
+      ${renderMetric("Siniestrado", summary.damaged, "", "siniestrado")}
     </div>
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
@@ -788,7 +782,8 @@ function renderOperationalControlView() {
   const validCompliance = items.filter((item) => Number.isFinite(item.operationalCompliance));
   const requiredDailyTotal = validCompliance.reduce((sum, item) => sum + (item.requiredDailyMinutes || 0), 0);
   const operationalDailyTotal = validCompliance.reduce((sum, item) => sum + (item.operationalDailyMinutes || 0), 0);
-  const globalCompliance = requiredDailyTotal > 0 ? (operationalDailyTotal / requiredDailyTotal) * 100 : null;
+  const missingBaselines = items.filter((item) => !item.hasFixedBaseline).length;
+  const globalCompliance = !missingBaselines && requiredDailyTotal > 0 ? (operationalDailyTotal / requiredDailyTotal) * 100 : null;
   const assignedWorkers = items.reduce((sum, item) => sum + (item.workers || 0), 0);
   const requiredWorkers = items.reduce((sum, item) => sum + (item.requiredWorkers || 0), 0);
   const ontime = items.filter((item) => item.status === "ontime").length;
@@ -800,10 +795,10 @@ function renderOperationalControlView() {
 
   return `
     <div class="grid metrics operation-metrics">
-      ${renderMetric("Cumplimiento global", globalCompliance === null ? "-" : `${Math.round(globalCompliance)}%`, "operativo contra requerido", complianceMetricStatus)}
+      ${renderMetric("Cumplimiento global", globalCompliance === null ? "-" : `${Math.round(globalCompliance)}%`, missingBaselines ? `${missingBaselines} saldos por recuperar` : "operativo contra requerido", complianceMetricStatus)}
       ${renderMetric("En tiempo", ontime, `de ${items.length} ensambles`, "terminado")}
       ${renderMetric("Atencion", risk + late, `${risk} en riesgo · ${late} atrasados`, risk + late ? "correccion" : "terminado")}
-      ${renderMetric("Personal", assignedWorkers, `${requiredWorkers} personas requeridas`, assignedWorkers >= requiredWorkers ? "terminado" : "detenido")}
+      ${renderMetric("Personal", assignedWorkers, missingBaselines ? "Requerimiento incompleto" : `${requiredWorkers} personas requeridas`, missingBaselines ? "en-proceso" : assignedWorkers >= requiredWorkers ? "terminado" : "detenido")}
     </div>
 
     <section class="panel operation-panel" style="margin-top: 14px;">
@@ -818,7 +813,7 @@ function renderOperationalControlView() {
       <div class="operation-control-grid">
         ${items.map((item, index) => renderOperationalControlCard(item, index)).join("")}
       </div>
-      <p class="planning-footnote">El saldo inicial queda fijado al 02/10/2026 con HORAS_PENDIENTES. FECHA_INICIO conserva el comienzo formal del plan. Actualizar Captura cambia el saldo actual y el pronostico, pero no modifica el saldo inicial ni la meta diaria original.</p>
+      <p class="planning-footnote">El saldo inicial del 02/10/2026 se conserva en un registro histórico compartido, independiente de Drive y de este navegador. Los 11 saldos fueron recuperados del historial del tablero publicado; actualizar Drive no los modifica.</p>
     </section>
   `;
 }
@@ -892,7 +887,7 @@ function renderDailyProductionIndicators(item) {
   if (!days.length) return "";
   const history = loadDailyProductionHistory();
   const processHistory = history.processes?.[item.id] || {};
-  const todayKey = localDateKey(new Date());
+  const todayKey = projectDateKey(new Date());
   const todayRecord = processHistory[todayKey];
   const cutoffLabel = todayRecord?.observedAt
     ? `Ultimo corte: ${formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
@@ -915,7 +910,7 @@ function renderDailyProductionIndicators(item) {
       <div class="daily-production-grid">
         ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
-      <p>Se calcula con la diferencia del saldo acumulado de Drive entre el inicio y la ultima actualizacion de cada dia.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Historial recuperado del 02 al 07/10/2026. Los días sin cortes válidos muestran “Sin dato”. Los nuevos cortes siguen guardándose en este navegador hasta contar con un historial central.</p>
     </div>
   `;
 }
@@ -924,10 +919,10 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
   const dateKey = localDateKey(date);
   const record = processHistory[dateKey];
   const isFuture = dateKey > todayKey;
-  const productionMinutes = record
-    ? Math.max(Number(record.startPendingMinutes) - Number(record.latestPendingMinutes), 0)
+  const productionMinutes = record && record.dailyValid !== false
+    ? Number.isFinite(record.startPendingMinutes) ? Math.max(record.startPendingMinutes - Number(record.latestPendingMinutes), 0) : null
     : null;
-  const percent = productionMinutes !== null && targetMinutes > 0
+  const percent = productionMinutes !== null && Number.isFinite(targetMinutes) && targetMinutes > 0
     ? (productionMinutes / targetMinutes) * 100
     : null;
   const status = isFuture
@@ -947,12 +942,14 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
   const weekday = date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "").slice(0, 3);
   const detail = `${weekday} ${formatShortDate(date)} · ${statusText} · ${productionMinutes === null ? "sin lectura" : `${formatWorkDuration(productionMinutes)} producidas`}`;
   const cutoffDetail = record?.observedAt
-    ? ` · corte ${formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})`
+    ? ` · lectura ${projectDateKey(record.observedAt)} ${formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})${record.validationNote ? " · " + record.validationNote : ""}`
     : "";
 
   return `
     <div class="daily-production-day ${status} ${dateKey === todayKey ? "today" : ""}" title="${escapeAttr(detail + cutoffDetail)}" aria-label="${escapeAttr(detail + cutoffDetail)}">
-      <span>${escapeHtml(weekday)}</span>
+      <span>${escapeHtml(weekday)} ${date.getDate()}/${date.getMonth() + 1}</span>
+      <strong>${statusText}</strong>
+      <small>${productionMinutes === null || isFuture ? "—" : formatWorkDuration(productionMinutes)}</small>
     </div>
   `;
 }
@@ -970,9 +967,10 @@ function getPlanningWorkdayDates(item) {
 
 function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDateKey = "") {
   if (!state.data?.planning?.length || !state.data?.equipos?.length) return;
-  if (snapshotType === "automatic") return;
+  if (snapshotType === "automatic" || snapshotType === "cached") return;
   const history = loadDailyProductionHistory();
-  const dateKey = requestedDateKey || localDateKey(new Date());
+  // A suspended tab can wake days later: never backdate a fresh Drive reading.
+  const dateKey = projectDateKey(new Date());
   const items = getDashboardPlanningStats(getDashboardAssemblyTimeStats()).filter((item) => item.planned);
 
   history.processes = history.processes || {};
@@ -980,18 +978,21 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
     const processHistory = history.processes[item.id] || {};
     const existing = processHistory[dateKey];
     if (snapshotType === "cached" && existing) return;
-    const priorRecord = Object.entries(processHistory)
-      .filter(([key]) => key < dateKey)
-      .sort(([a], [b]) => b.localeCompare(a))[0]?.[1];
-    const startPendingMinutes = existing?.startPendingMinutes
-      ?? priorRecord?.latestPendingMinutes
-      ?? item.planningPendingMinutes;
+    const previousDate = parseIsoLocalDate(dateKey);
+    previousDate.setDate(previousDate.getDate() - 1);
+    const priorRecord = processHistory[localDateKey(previousDate)];
+    const startPendingMinutes = (existing?.dailyValid ? existing.startPendingMinutes : null)
+      ?? (priorRecord?.dateValid ? priorRecord.latestPendingMinutes : null)
+      ?? (dateKey === INITIAL_BALANCE_DATE ? item.planningPendingMinutes : null);
 
     processHistory[dateKey] = {
       startPendingMinutes,
       latestPendingMinutes: item.currentPendingMinutes,
       observedAt: new Date().toISOString(),
       snapshotType,
+      dateValid: true,
+      dailyValid: Number.isFinite(startPendingMinutes),
+      intervalValidated: true,
     };
     history.processes[item.id] = processHistory;
   });
@@ -1004,12 +1005,40 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
 }
 
 function loadDailyProductionHistory() {
-  try {
-    const history = JSON.parse(localStorage.getItem(DAILY_PRODUCTION_STORAGE_KEY) || "null");
-    return history && typeof history === "object" ? history : { processes: {} };
-  } catch {
-    return { processes: {} };
+  let local = { processes: {} };
+  try { local = JSON.parse(localStorage.getItem(DAILY_PRODUCTION_STORAGE_KEY) || "null") || local; } catch { /* Keep recovered records. */ }
+  const history = { processes: {} };
+  for (const process of PROCESS_DEFS) {
+    const records = { ...(recoveredDailyHistory.processes?.[process.id] || {}) };
+    for (const [date, record] of Object.entries(local.processes?.[process.id] || {})) {
+      // A local reading only supersedes a recovered one if it belongs to that day
+      // and is more recent. A mislabeled cutoff cannot overwrite a valid record.
+      if (projectDateKey(record.observedAt) !== date) continue;
+      if (!records[date] || Date.parse(record.observedAt) > Date.parse(records[date].observedAt)) records[date] = record;
+    }
+    for (const [date, record] of Object.entries(records)) {
+      const dateValid = projectDateKey(record.observedAt) === date;
+      const previousDate = parseIsoLocalDate(date);
+      previousDate.setDate(previousDate.getDate() - 1);
+      const previousKey = localDateKey(previousDate);
+      const previous = records[previousKey];
+      const consecutive = previous && projectDateKey(previous.observedAt) === previousKey;
+      const dailyValid = dateValid && Number.isFinite(record.startPendingMinutes)
+        && Number.isFinite(record.latestPendingMinutes)
+        && (record.intervalValidated ? record.dailyValid : Boolean(consecutive));
+      records[date] = { ...record, dateValid, dailyValid,
+        validationNote: !dateValid ? "La fecha de lectura no corresponde a este día."
+          : !dailyValid ? "Falta un corte inicial válido para calcular la producción diaria." : "" };
+    }
+    history.processes[process.id] = records;
   }
+  return history;
+}
+
+function projectDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("sv-SE", { timeZone: "America/Mexico_City" });
 }
 
 function localDateKey(value) {
@@ -1021,7 +1050,7 @@ function localDateKey(value) {
 function formatCutoffTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Mexico_City" });
 }
 
 function snapshotTypeLabel(value) {
@@ -1166,13 +1195,12 @@ function getDashboardPlanningStats(assemblyTimeStats) {
     const plannedStart = parseIsoLocalDate(plan.startDate);
     const deadline = parseIsoLocalDate(plan.deadline);
     const baselineDate = parseIsoLocalDate(INITIAL_BALANCE_DATE);
-    const effectiveStart = plannedStart || today;
-    const hasFixedBaseline = Boolean(baselineDate && Number.isFinite(plan.manualPendingMinutes));
-    const planningPendingMinutes = Number.isFinite(plan.manualPendingMinutes)
-      ? plan.manualPendingMinutes
-      : hours.pendingMinutes;
+    const effectiveStart = plannedStart && plannedStart > today ? plannedStart : today;
+    const fixed = initialBalances[hours.id];
+    const hasFixedBaseline = Boolean(baselineDate && Number.isFinite(fixed?.minutes));
+    const planningPendingMinutes = hasFixedBaseline ? fixed.minutes : null;
     const capacityMinutes = plan.workers * plan.hoursPerDay * 60;
-    const requiredDays = capacityMinutes > 0 ? Math.ceil(planningPendingMinutes / capacityMinutes) : null;
+    const requiredDays = capacityMinutes > 0 ? Math.ceil(hours.pendingMinutes / capacityMinutes) : null;
     const availableDays = plannedStart && deadline
       ? countWorkdaysInclusive(plannedStart, deadline, plan.calendar)
       : null;
@@ -1181,8 +1209,9 @@ function getDashboardPlanningStats(assemblyTimeStats) {
       : today > deadline
         ? 0
         : countWorkdaysInclusive(today < effectiveStart ? effectiveStart : today, deadline, plan.calendar);
-    const requiredDailyMinutes = availableDays > 0
-      ? planningPendingMinutes / availableDays
+    const baselineWorkdays = Number.isFinite(fixed?.workdays) ? fixed.workdays : availableDays;
+    const requiredDailyMinutes = hasFixedBaseline && baselineWorkdays > 0
+      ? planningPendingMinutes / baselineWorkdays
       : null;
     const elapsedScheduleDays = !plannedStart || !deadline
       ? null
@@ -1216,7 +1245,7 @@ function getDashboardPlanningStats(assemblyTimeStats) {
         : bufferDays <= 2
           ? "risk"
           : "ontime";
-    const status = operationalCompliance === null
+    const status = !hasFixedBaseline ? "missing" : operationalCompliance === null
       ? capacityStatus
       : operationalCompliance >= 100
         ? "ontime"
@@ -2630,31 +2659,18 @@ function renderConfigView() {
           <div>
             <p class="panel-label">Drive</p>
             <h2 class="panel-title">Hojas principales</h2>
+            <p class="panel-subtitle">Fuentes compartidas para todos los equipos. Los cambios de conexión se administran en la configuración del tablero.</p>
           </div>
-        </div>
-        <div class="quick-source-box">
-          <label class="field">
-            <span class="field-label">Archivo completo AVANCE DE ENSAMBLE</span>
-            <input class="input" data-workbook-source value="${escapeAttr(state.config.workbook || "")}" placeholder="Pega aqui un solo enlace publicado del Google Sheet completo" />
-          </label>
-          <label class="field">
-            <span class="field-label">Carga rapida</span>
-            <textarea class="textarea" data-bulk-sources placeholder="Opcional: pega varios enlaces solo si necesitas ajustar hojas con nombre distinto."></textarea>
-          </label>
-          <button class="ghost-button" data-action="apply-bulk-sources">Aplicar enlaces</button>
         </div>
         <div class="source-fields">
           ${SOURCE_FIELDS.map((field) => `
             <label class="field">
               <span class="field-label">${field.label}</span>
-              <input class="input" data-source-key="${field.key}" value="${escapeAttr(state.config[field.key] || "")}" placeholder="https://docs.google.com/spreadsheets/..." />
+              <input class="input" data-source-key="${field.key}" readonly value="${escapeAttr(state.config[field.key] || "")}" placeholder="https://docs.google.com/spreadsheets/..." />
             </label>
           `).join("")}
           <div class="toolbar" style="justify-content:flex-start;">
-            <button class="solid-button" data-action="load-drive">Guardar y cargar</button>
-            <button class="ghost-button" data-action="load-finance-drive">Cargar solo Finanzas</button>
-            <button class="ghost-button" data-action="save-config">Guardar</button>
-            <button class="ghost-button" data-action="clear-config">Limpiar</button>
+            <button class="solid-button" data-action="load-drive">Actualizar desde Drive</button>
             <button class="ghost-button danger-button" data-action="clear-platform-data">Borrar datos del tablero</button>
             <button class="ghost-button" data-action="reset-demo">Demo</button>
           </div>
@@ -2672,7 +2688,7 @@ function renderConfigView() {
           ${PROCESS_DEFS.map((process) => `
             <label class="field">
               <span class="field-label">${escapeHtml(process.sheet)}</span>
-              <input class="input" data-process-source="${process.id}" value="${escapeAttr(state.config.processSheets[process.id] || "")}" placeholder="URL CSV" />
+              <input class="input" data-process-source="${process.id}" readonly value="${escapeAttr(state.config.processSheets[process.id] || "")}" placeholder="URL CSV" />
             </label>
           `).join("")}
         </div>
@@ -2856,13 +2872,25 @@ async function buildDatasetFromConfig(config, baseData = createEmptyDataset()) {
   data.updatedAt = new Date().toISOString();
 
   const loadErrors = [];
+  const responses = new Map();
+  const uniqueUrls = [...new Set(urls.map((item) => item.url))];
+  for (let index = 0; index < uniqueUrls.length; index += 4) {
+    const batch = uniqueUrls.slice(index, index + 4);
+    const results = await Promise.allSettled(batch.map(fetchCsv));
+    results.forEach((result, offset) => responses.set(batch[offset], result));
+  }
+  let revision = 2166136261;
   let loadedCount = 0;
   const loadedKinds = new Set();
   for (const item of urls) {
     if (item.optional && loadedKinds.has(item.kind)) continue;
     try {
-      const text = await fetchCsv(item.url);
+      const result = responses.get(item.url);
+      if (result.status === "rejected") throw result.reason;
+      const text = result.value;
       applyCsvToDataset(data, item.kind, text);
+      validateImportedKind(data, item.kind);
+      for (const char of item.kind + text) revision = Math.imul(revision ^ char.charCodeAt(0), 16777619);
       loadedCount += 1;
       loadedKinds.add(item.kind);
     } catch (error) {
@@ -2870,11 +2898,13 @@ async function buildDatasetFromConfig(config, baseData = createEmptyDataset()) {
     }
   }
 
-  if (!loadedCount && loadErrors.length) throw new Error(loadErrors.join(" / "));
+  if (loadErrors.length) throw new Error(loadErrors.join(" / "));
   if (!loadedCount && urls.length) throw new Error("No pude leer ninguna hoja del archivo completo. Revisa que el Google Sheet este publicado en la web y que el enlace abra en el navegador.");
 
   const normalized = normalizeDataset(data);
   normalized.loadErrors = loadErrors;
+  normalized.sourceRevision = (revision >>> 0).toString(16).padStart(8, "0");
+  normalized.updatedAt = new Date().toISOString();
   return normalized;
 }
 
@@ -2882,9 +2912,11 @@ async function fetchCsv(inputUrl) {
   const url = normalizeGoogleCsvUrl(inputUrl);
   const requestUrl = isGoogleSheetsUrl(url) ? appendCacheBuster(url) : url;
   try {
-    const response = await fetch(requestUrl, { cache: "no-store" });
+    const response = await fetch(requestUrl, { cache: "no-store", signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error(`HTTP ${response.status} en ${url}`);
-    return await response.text();
+    const text = await response.text();
+    if (!text.trim() || /^\s*</.test(text)) throw new Error("La fuente no devolvió un CSV válido");
+    return text;
   } catch (error) {
     if (isGoogleSheetsUrl(inputUrl)) return fetchGoogleSheetCsvViaJsonp(inputUrl);
     throw error;
@@ -3161,7 +3193,7 @@ function parseMcGeneralRows(rows) {
   const equipos = dataRows.map((row, index) => {
     const control = String(row[1] || "").trim();
     const vin = String(row[2] || "").trim();
-    const id = control || `EQ-${index + 1}`;
+    const id = equipmentRowId(row, control, rows) || `EQ-${index + 1}`;
     const statusValue = statusColumn.index >= 0 ? String(row[statusColumn.index] || "").trim() : "";
     const rawStatus = statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue) ? "detenido" : statusValue;
     if (deliveredColumn >= 0) delivered[id] = isDeliveredCheckValue(row[deliveredColumn]);
@@ -3196,7 +3228,9 @@ function parseMcGeneralRows(rows) {
 
     return {
       id,
-      control: id,
+      control,
+      sourceRow: row.sourceRow,
+      damaged: isDamagedEquipmentRow(row, control),
       vin,
       serie_grua: "",
       division: String(row[5] || "").trim(),
@@ -3286,12 +3320,14 @@ function parseMcAvanceRows(rows) {
     const vin = String(row[2] || "").trim();
     if (!isEquipmentCode(control) && !vin) return;
 
-    const id = control || `EQ-${index + 1}`;
+    const id = equipmentRowId(row, control, rows) || `EQ-${index + 1}`;
     const statusValue = statusColumn.index >= 0 ? String(row[statusColumn.index] || "").trim() : "";
     const rawStatus = statusColumn.kind === "detenido" && isStoppedCheckValue(statusValue) ? "detenido" : statusValue;
     equipos.push({
       id,
-      control: id,
+      control,
+      sourceRow: row.sourceRow,
+      damaged: isDamagedEquipmentRow(row, control),
       vin,
       serie_grua: "",
       division: String(row[4] || "").trim(),
@@ -3467,7 +3503,7 @@ function normalizeDataset(data) {
     const progress = getEquipmentProgress(data, id);
     const totals = progressTotals(progress);
     const rawStatus = normalizeStatus(equipo.rawStatus);
-    const status = rawStatus || computedStatus(equipo, totals);
+    const status = equipo.damaged ? "siniestrado" : rawStatus || computedStatus(equipo, totals);
     return {
       ...equipo,
       id,
@@ -3591,24 +3627,26 @@ function getSummary(data) {
       .map((equipo) => matchKey(equipo.vin))
       .filter(Boolean)
   ).size;
-  const fixedTotal = vinTotal || equipos.length || Number(data.meta?.equipos) || 170;
+  const fixedTotal = equipos.length || Number(data.meta?.equipos) || 170;
+  const damaged = equipos.filter((equipo) => equipo.status === "siniestrado").length;
   const finishedIds = new Set(
     equipos
-      .filter((equipo) => progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
+      .filter((equipo) => equipo.status !== "siniestrado" && progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
       .map((equipo) => equipo.id)
   );
   const finished = finishedIds.size;
   const stopped = equipos.filter((equipo) => !finishedIds.has(equipo.id) && equipo.status === "detenido").length;
   const inProgress = equipos.filter((equipo) => {
-    if (finishedIds.has(equipo.id) || equipo.status === "detenido") return false;
+    if (finishedIds.has(equipo.id) || equipo.status === "detenido" || equipo.status === "siniestrado") return false;
     return equipo.status === "en_proceso" || equipo.status === "correccion";
   }).length;
-  const pending = Math.max(fixedTotal - finished - inProgress - stopped, 0);
+  const pending = Math.max(fixedTotal - finished - inProgress - stopped - damaged, 0);
   const delivered = getDeliveredCount(data);
   return {
     total: fixedTotal,
     fixedTotal,
     activeRows: equipos.length,
+    damaged,
     finished,
     stopped,
     delivered,
@@ -3810,7 +3848,8 @@ function getDashboardStatusStats(summary) {
   return [
     { key: "terminado", label: "Terminado", count: summary.finished, color: STATUS.terminado.color },
     { key: "en_proceso", label: "En proceso", count: summary.inProgress, color: STATUS.en_proceso.color },
-    { key: "pendiente", label: "Pendiente", count: summary.pending, color: STATUS.pendiente.color },
+    { key: "siniestrado", label: "Siniestrado", count: summary.damaged, color: STATUS.siniestrado.color },
+    ...(summary.pending ? [{ key: "pendiente", label: "Sin iniciar", count: summary.pending, color: STATUS.pendiente.color }] : []),
     { key: "detenido", label: "Detenido", count: summary.stopped, color: STATUS.detenido.color },
   ].filter((item) => item.count > 0);
 }
@@ -3983,7 +4022,10 @@ function updateActivityState(activityId, nextState) {
     updatedAt: new Date().toISOString(),
   };
   state.data = normalizeDataset(state.data);
-  state.toast = "Actividad actualizada.";
+  state.data.sourceRevision = "";
+  state.data.source = "Captura local sin guardar en Drive";
+  state.syncError = "Captura local: estos cambios solo están en este navegador. Actualizar restaura la lectura de Drive.";
+  state.toast = state.syncError;
   render();
 }
 
@@ -4193,6 +4235,7 @@ function formatClockMinutes(minutes) {
 }
 
 function formatWorkDuration(minutes) {
+  if (!Number.isFinite(minutes)) return "Sin saldo histórico";
   const hours = Math.floor(minutes / 60);
   const remainder = Math.round(minutes % 60);
   return `${hours.toLocaleString("es-MX")} h ${String(remainder).padStart(2, "0")} min`;
@@ -4546,6 +4589,7 @@ function computedStatus(equipo, totals) {
 function normalizeStatus(value) {
   const text = normalizeText(value);
   if (!text) return "";
+  if (text.includes("siniestr")) return "siniestrado";
   if (text.includes("termin")) return "terminado";
   if (text.includes("deten") || text.includes("bloq")) return "detenido";
   if (text.includes("corr") || text.includes("rech")) return "correccion";
@@ -4699,7 +4743,7 @@ function clamp(value, min, max) {
 
 function nonEmptyCsvRows(text) {
   return parseCsv(text)
-    .map((row) => row.map((cell) => String(cell ?? "").trim()))
+    .map((row, index) => Object.assign(row.map((cell) => String(cell ?? "").trim()), { sourceRow: index + 1 }))
     .filter((row) => row.some((cell) => cell !== ""));
 }
 
@@ -4976,8 +5020,9 @@ function parseMcProcessRows(rows, process) {
 
   dataRows.forEach((row) => {
     const equipoCol = findEquipmentColumn(row);
-    const equipoId = row[equipoCol];
-    if (!isEquipmentCode(equipoId)) return;
+    const control = row[equipoCol];
+    if (!isEquipmentCode(control)) return;
+    const equipoId = equipmentRowId(row, control, rows);
     if (deliveredColumn >= 0) delivered[equipoId] = isDeliveredCheckValue(row[deliveredColumn]);
 
     let done = 0;
@@ -5263,55 +5308,34 @@ function isPublishedGoogleSheetsUrl(inputUrl) {
 function googleSheetsGvizUrl(inputUrl) {
   const url = String(inputUrl || "").trim();
   const gidMatch = url.match(/[?#&]gid=([0-9]+)/);
-  const gid = gidMatch ? gidMatch[1] : "0";
+  const sheet = new URL(url).searchParams.get("sheet");
+  const selector = sheet ? `sheet=${encodeURIComponent(sheet)}` : `gid=${gidMatch ? gidMatch[1] : "0"}`;
   const publishedMatch = url.match(/\/spreadsheets\/d\/e\/([^/]+)/);
   if (publishedMatch) {
-    return `https://docs.google.com/spreadsheets/d/e/${publishedMatch[1]}/gviz/tq?gid=${gid}&tqx=out:json`;
+    return `https://docs.google.com/spreadsheets/d/e/${publishedMatch[1]}/gviz/tq?${selector}&tqx=out:json`;
   }
   const match = url.match(/\/spreadsheets\/d\/([^/]+)/);
   if (!match) return "";
-  return `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?gid=${gid}&tqx=out:json`;
+  return `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?${selector}&tqx=out:json`;
 }
 
 function fetchGoogleSheetCsvViaJsonp(inputUrl) {
   const url = googleSheetsGvizUrl(inputUrl);
-  if (!url || typeof document === "undefined" || !document.createElement) return Promise.reject(new Error("No se pudo preparar Google Sheets."));
-
+  if (!url) return Promise.reject(new Error("No se pudo preparar Google Sheets"));
   return new Promise((resolve, reject) => {
-    const previousGoogle = window.google;
-    const previousSetResponse = window.google?.visualization?.Query?.setResponse;
+    const callback = "tableroGviz_" + crypto.randomUUID().replaceAll("-", "");
     const script = document.createElement("script");
-    const cleanup = () => {
-      script.remove();
-      if (previousGoogle) {
-        window.google = previousGoogle;
-        if (previousSetResponse) window.google.visualization.Query.setResponse = previousSetResponse;
-      }
-    };
-    const timer = window.setTimeout(() => {
+    const cleanup = () => { clearTimeout(timer); script.remove(); delete window[callback]; };
+    const timer = setTimeout(() => { cleanup(); reject(new Error("Tiempo agotado al leer Google Sheets")); }, 15000);
+    window[callback] = (response) => {
       cleanup();
-      reject(new Error("Tiempo agotado al leer Google Sheets."));
-    }, 15000);
-
-    window.google = window.google || {};
-    window.google.visualization = window.google.visualization || {};
-    window.google.visualization.Query = window.google.visualization.Query || {};
-    window.google.visualization.Query.setResponse = (response) => {
-      window.clearTimeout(timer);
-      cleanup();
-      if (response?.status === "error") {
-        reject(new Error(response.errors?.[0]?.detailed_message || "Google Sheets regreso un error."));
-        return;
-      }
-      resolve(gvizResponseToCsv(response));
+      if (response?.status === "error") return reject(new Error(response.errors?.[0]?.detailed_message || "Error de Google Sheets"));
+      const csv = gvizResponseToCsv(response);
+      if (!csv) return reject(new Error("Hoja vacía"));
+      resolve(csv);
     };
-
-    script.onerror = () => {
-      window.clearTimeout(timer);
-      cleanup();
-      reject(new Error("No se pudo cargar Google Sheets publicado."));
-    };
-    script.src = url;
+    script.onerror = () => { cleanup(); reject(new Error("No se pudo leer Google Sheets")); };
+    script.src = appendCacheBuster(url.replace("tqx=out:json", "tqx=" + encodeURIComponent("out:json;responseHandler:" + callback)));
     document.head.appendChild(script);
   });
 }
@@ -5556,4 +5580,27 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value).replace(/`/g, "&#096;");
+}
+
+// Both rows 171 repeat VIN and warehouse. Centro Sur is the damaged row 134,
+// Baja California remains the active row. Do not classify by VIN alone.
+function isDamagedEquipmentRow(row, control) {
+  return String(control).trim() === "150-512"
+    && row.some((cell) => normalizeText(cell) === "centro sur");
+}
+
+function equipmentRowId(row, control, rows = []) {
+  if (String(control).trim() !== "150-512") return control;
+  // The source repeats both VIN and warehouse, even division on process sheets.
+  // The first occurrence corresponds to the damaged row in avance (134).
+  const duplicates = rows.filter((candidate) => candidate[1] === control && candidate[2] === "3HAEUMMR7VL306693");
+  const damaged = isDamagedEquipmentRow(row, control) || (duplicates.length === 2 && duplicates[0] === row);
+  return damaged ? control + "::siniestrado-centro-sur" : control;
+}
+
+function validateImportedKind(data, kind) {
+  if ((kind === "avance" || kind === "equipos") && !data.equipos.length) throw new Error("Hoja sin unidades reconocibles");
+  if (kind === "planning" && !data.planning.length) throw new Error("Hoja de planeación sin ensambles");
+  if (kind === "finanzas" && !data.finanzas.length) throw new Error("Hoja financiera sin registros");
+  if (kind.startsWith("process:") && !data.activityDefinitions[kind.split(":")[1]]?.length) throw new Error("Hoja sin actividades reconocibles");
 }
