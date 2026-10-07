@@ -37,6 +37,13 @@
       "filename": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 6 de octubre, 13_00.xlsx",
       "sha256": "29a6afa09e6ffe1971e73a92bfb2e809e12d93d681b5f337f219d24feccf4d47",
       "units": 171
+    },
+    {
+      "date": "2026-10-07",
+      "observedAt": "2026-10-07T16:23:52-06:00",
+      "filename": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+      "sha256": "de4cdf6f0250712154c39b8734c7263ab84d209c1754383c988a35d13c68359d",
+      "units": 171
     }
   ],
   "processes": {
@@ -114,6 +121,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 8680,
+        "latestPendingMinutes": 6520,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 2160,
+        "completedActivities": 50,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "talleres": {
@@ -190,6 +215,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 16810,
+        "latestPendingMinutes": 16810,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "electrico": {
@@ -266,6 +309,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 16480,
+        "latestPendingMinutes": 16480,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "hidraulico": {
@@ -342,6 +403,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 11310,
+        "latestPendingMinutes": 10480,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 830,
+        "completedActivities": 88,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "pedestal": {
@@ -418,6 +497,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 14255,
+        "latestPendingMinutes": 12720,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 1275,
+        "completedActivities": 103,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": -260,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "brazos": {
@@ -494,6 +591,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 38220,
+        "latestPendingMinutes": 34800,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 3420,
+        "completedActivities": 296,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "pruebas_iniciales": {
@@ -570,6 +685,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 9040,
+        "latestPendingMinutes": 8420,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 620,
+        "completedActivities": 124,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "acabado_inicial": {
@@ -646,6 +779,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 28390,
+        "latestPendingMinutes": 28390,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "pintura_detalles": {
@@ -722,6 +873,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 6522,
+        "latestPendingMinutes": 6522,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "acabado_final": {
@@ -798,6 +967,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 20905,
+        "latestPendingMinutes": 19285,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 1620,
+        "completedActivities": 9,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     },
     "calidad_final": {
@@ -874,6 +1061,24 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0
+      },
+      "2026-10-07": {
+        "startPendingMinutes": 28920,
+        "latestPendingMinutes": 27500,
+        "observedAt": "2026-10-07T16:23:52-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (2).xlsx",
+        "periodStart": "2026-10-06T13:00:00-06:00",
+        "productionMinutes": 1420,
+        "completedActivities": 284,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Hora de archivo descargado; no acredita la hora del último llenado. Fecha del corte indicada por el usuario.",
+        "excludesDamaged": true
       }
     }
   }

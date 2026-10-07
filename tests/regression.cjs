@@ -99,7 +99,11 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.equal(archived.processes.estructurales['2026-10-05'].pendingAdjustmentMinutes, 240);
   assert.equal(archived.processes.talleres['2026-10-06'].productionMinutes, 2045);
   assert.equal(archived.processes.electrico['2026-10-02'].dailyValid, false);
-  assert.equal(archived.processes.electrico['2026-10-07'].dailyValid, false);
+  assert.equal(archived.processes.electrico['2026-10-07'].dailyValid, true);
+  assert.equal(archived.processes.electrico['2026-10-07'].productionMinutes, 0);
+  assert.equal(archived.processes.pedestal['2026-10-07'].productionMinutes, 1275);
+  assert.equal(archived.processes.pedestal['2026-10-07'].excludesDamaged, true);
+  assert.match(run('renderDailyProductionDay(parseIsoLocalDate("2026-10-07"),"2026-10-07",loadDailyProductionHistory().processes.electrico,100)'), /Archivo del día/);
   for (const records of Object.values(context.archiveFixture.processes)) {
     for (const [date, record] of Object.entries(records)) {
       if (date === '2026-10-02') continue;

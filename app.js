@@ -900,7 +900,7 @@ function renderDailyProductionIndicators(item) {
   const todayKey = projectDateKey(new Date());
   const todayRecord = Object.values(processHistory).filter(record => record.dailyValid || record.baselineOnly).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt))[0];
   const cutoffLabel = todayRecord?.observedAt
-    ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
+    ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${todayRecord.cutoffTimeUnknown ? "hora no confirmada" : formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
     : "Sin corte válido registrado";
 
   return `
@@ -920,7 +920,7 @@ function renderDailyProductionIndicators(item) {
       <div class="daily-production-grid">
         ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 06/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 07/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; el archivo del 07 no indica hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }
@@ -952,10 +952,10 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
   const weekday = date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "").slice(0, 3);
   const detail = `${weekday} ${formatShortDate(date)} · ${statusText} · ${productionMinutes === null ? "sin lectura" : `${formatWorkDuration(productionMinutes)} producidas`}`;
   const intervalDetail = record?.periodStart
-    ? ' · Desde ' + projectDateKey(record.periodStart) + ' ' + formatCutoffTime(record.periodStart) + ' hasta ' + projectDateKey(record.observedAt) + ' ' + formatCutoffTime(record.observedAt) + '. Avance entre cortes, no jornada completa.' + (record.pendingAdjustmentMinutes ? ' Ajuste de pendientes por cambios del listado: ' + record.pendingAdjustmentMinutes + ' min; excluido de producción.' : '')
+    ? ' · Desde ' + projectDateKey(record.periodStart) + ' ' + formatCutoffTime(record.periodStart) + ' hasta ' + projectDateKey(record.observedAt) + ' ' + (record.cutoffTimeUnknown ? 'hora no confirmada' : formatCutoffTime(record.observedAt)) + '. Avance entre cortes, no jornada completa.' + (record.pendingAdjustmentMinutes ? ' Ajuste de pendientes por cambios del listado: ' + record.pendingAdjustmentMinutes + ' min; excluido de producción.' : '')
     : '';
   const cutoffDetail = record?.observedAt
-    ? ` · lectura ${projectDateKey(record.observedAt)} ${formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})${record.validationNote ? " · " + record.validationNote : ""}`
+    ? ` · lectura ${projectDateKey(record.observedAt)} ${record.cutoffTimeUnknown ? "hora no confirmada" : formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})${record.validationNote ? " · " + record.validationNote : ""}`
     : "";
 
   return `
@@ -963,7 +963,7 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
       <span>${escapeHtml(weekday)} ${date.getDate()}/${date.getMonth() + 1}</span>
       <strong>${statusText}</strong>
       <small>${productionMinutes === null || isFuture ? "—" : formatWorkDuration(productionMinutes)}</small>
-      ${record?.snapshotType === "historical-file" ? `<small>Corte ${formatCutoffTime(record.observedAt)}</small><small>${record.baselineOnly ? "Saldo inicial" : "Entre cortes"}</small>` : ""}
+      ${record?.snapshotType === "historical-file" ? `<small>${record.cutoffTimeUnknown ? "Archivo del día" : "Corte " + formatCutoffTime(record.observedAt)}</small><small>${record.baselineOnly ? "Saldo inicial" : "Entre cortes"}</small>` : ""}
     </div>
   `;
 }
