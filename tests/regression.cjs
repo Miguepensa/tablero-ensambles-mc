@@ -111,6 +111,12 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
       assert.equal(record.reopenedActivities, 0);
     }
   }
+  assert.equal(archived.processes.electrico['2026-10-08'].productionMinutes, 1775);
+  assert.equal(archived.processes.estructurales['2026-10-08'].productionMinutes, 1350);
+  assert.equal(archived.processes.acabado_inicial['2026-10-08'].productionMinutes, 6585);
+  assert.equal(archived.processes.electrico['2026-10-08'].partial, true);
+  assert.equal(archived.processes.electrico['2026-10-08'].excludesDamaged, true);
+  assert.match(run('renderDailyProductionDay(parseIsoLocalDate("2026-10-08"),"2026-10-08",loadDailyProductionHistory().processes.electrico,100)'), /Corte parcial/);
   const archiveCell = run('renderDailyProductionDay(parseIsoLocalDate("2026-10-05"),"2026-10-07",loadDailyProductionHistory().processes.electrico,100)');
   assert.match(archiveCell, /12 h 25 min/);
   assert.match(archiveCell, /Corte 21:35/);
