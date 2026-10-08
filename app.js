@@ -900,7 +900,7 @@ function renderDailyProductionIndicators(item) {
   const todayKey = projectDateKey(new Date());
   const todayRecord = Object.values(processHistory).filter(record => record.dailyValid || record.baselineOnly).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt))[0];
   const cutoffLabel = todayRecord?.observedAt
-    ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${todayRecord.cutoffTimeUnknown ? "hora no confirmada" : formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
+    ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${todayRecord.cutoffTimeUnknown ? "" : formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
     : "Sin corte válido registrado";
 
   return `
@@ -910,6 +910,7 @@ function renderDailyProductionIndicators(item) {
           <span>Semáforo diario</span>
           <strong>Producción contra meta</strong>
           <small>${escapeHtml(cutoffLabel)}</small>
+          ${state.data.sourceRevision && state.data.updatedAt ? `<small>Última lectura de Drive: ${escapeHtml(new Date(state.data.updatedAt).toLocaleString("es-MX", { timeZone: "America/Mexico_City" }))}</small>` : ""}
         </div>
         <div class="daily-production-legend" aria-label="Criterio del semaforo diario">
           <span class="green">Meta cumplida</span>
