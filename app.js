@@ -921,7 +921,7 @@ function renderDailyProductionIndicators(item) {
       <div class="daily-production-grid">
         ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 08/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 y 08 no indican hora de cierre. El 08 es un corte parcial. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 09/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 09 no indican hora de cierre. Los cortes del 08 y 09 son parciales. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }
@@ -964,6 +964,7 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
       <span>${escapeHtml(weekday)} ${date.getDate()}/${date.getMonth() + 1}</span>
       <strong>${statusText}</strong>
       <small>${productionMinutes === null || isFuture ? "—" : formatWorkDuration(productionMinutes)}</small>
+      ${productionMinutes < 0 ? "<small>Reversión neta</small>" : ""}
       ${record?.snapshotType === "historical-file" ? `<small>${record.partial ? "Corte parcial" : record.cutoffTimeUnknown ? "Archivo del día" : "Corte " + formatCutoffTime(record.observedAt)}</small><small>${record.baselineOnly ? "Saldo inicial" : "Entre cortes"}</small>` : ""}
     </div>
   `;
@@ -4256,9 +4257,10 @@ function formatClockMinutes(minutes) {
 
 function formatWorkDuration(minutes) {
   if (!Number.isFinite(minutes)) return "Sin saldo histórico";
-  const hours = Math.floor(minutes / 60);
-  const remainder = Math.round(minutes % 60);
-  return `${hours.toLocaleString("es-MX")} h ${String(remainder).padStart(2, "0")} min`;
+  const total = Math.round(Math.abs(minutes));
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  return `${minutes < 0 ? "−" : ""}${hours.toLocaleString("es-MX")} h ${String(remainder).padStart(2, "0")} min`;
 }
 
 function renderProcessBarRow(process) {

@@ -108,7 +108,7 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
     for (const [date, record] of Object.entries(records)) {
       if (date === '2026-10-02') continue;
       assert.equal(record.startPendingMinutes - record.productionMinutes + record.pendingAdjustmentMinutes, record.latestPendingMinutes);
-      assert.equal(record.reopenedActivities, date === '2026-10-08' && /\((4|5)\)/.test(record.sourceFile) && record.latestPendingMinutes === 6160 ? 36 : 0);
+      assert.equal(record.reopenedActivities, date === '2026-10-09' && record.latestPendingMinutes === 21955 ? 1116 : date === '2026-10-08' && /\((4|5)\)/.test(record.sourceFile) && record.latestPendingMinutes === 6160 ? 36 : 0);
     }
   }
   assert.equal(archived.processes.electrico['2026-10-08'].productionMinutes, 1775);
@@ -117,6 +117,10 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.equal(archived.processes.electrico['2026-10-08'].partial, true);
   assert.equal(archived.processes.electrico['2026-10-08'].excludesDamaged, true);
   assert.match(run('renderDailyProductionDay(parseIsoLocalDate("2026-10-08"),"2026-10-08",loadDailyProductionHistory().processes.electrico,100)'), /Corte parcial/);
+  assert.equal(archived.processes.talleres['2026-10-09'].productionMinutes, -5125);
+  assert.equal(archived.processes.electrico['2026-10-09'].productionMinutes, 895);
+  assert.equal(run('formatWorkDuration(-5125)'), '−85 h 25 min');
+  assert.match(run('renderDailyProductionDay(parseIsoLocalDate("2026-10-09"),"2026-10-09",loadDailyProductionHistory().processes.talleres,100)'), /Reversión neta/);
   const archiveCell = run('renderDailyProductionDay(parseIsoLocalDate("2026-10-05"),"2026-10-07",loadDailyProductionHistory().processes.electrico,100)');
   assert.match(archiveCell, /12 h 25 min/);
   assert.match(archiveCell, /Corte 21:35/);
