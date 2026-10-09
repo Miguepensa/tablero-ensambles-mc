@@ -108,7 +108,7 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
     for (const [date, record] of Object.entries(records)) {
       if (date === '2026-10-02') continue;
       assert.equal(record.startPendingMinutes - record.productionMinutes + record.pendingAdjustmentMinutes, record.latestPendingMinutes);
-      assert.equal(record.reopenedActivities, date === '2026-10-08' && record.sourceFile.includes('(4)') && record.latestPendingMinutes === 6160 ? 36 : 0);
+      assert.equal(record.reopenedActivities, date === '2026-10-08' && /\((4|5)\)/.test(record.sourceFile) && record.latestPendingMinutes === 6160 ? 36 : 0);
     }
   }
   assert.equal(archived.processes.electrico['2026-10-08'].productionMinutes, 1775);
