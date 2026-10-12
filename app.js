@@ -855,6 +855,7 @@ function renderOperationalControlCard(item, index = 0) {
         <span class="planning-status ${item.status}">${statusLabels[item.status]}</span>
       </div>
 
+      ${renderDeadlineNotice(item)}
       <div class="operation-schedule">
         <div><span>Fecha del saldo</span><strong>${formatShortDate(item.baselineDate)}</strong></div>
         <div><span>Inicio del plan</span><strong>${formatShortDate(parseIsoLocalDate(item.startDate))}</strong></div>
@@ -890,6 +891,36 @@ function renderOperationalControlCard(item, index = 0) {
   `;
 }
 
+function getDeadlineTracking(item, processHistory = {}, todayKey = projectDateKey(new Date())) {
+  const deadlineKey = item.deadlineDate ? localDateKey(item.deadlineDate) : "";
+  const daysBetween = (a, b) => Math.max(0, Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000));
+  const completed = Number.isFinite(item.currentPendingMinutes) && item.currentPendingMinutes === 0;
+  const records = Object.entries(processHistory).filter(([date, r]) => date <= todayKey && r.dateValid && Number.isFinite(r.latestPendingMinutes)).sort(([a], [b]) => a.localeCompare(b));
+  let completedDate = null;
+  for (const [date, record] of records) {
+    if (record.latestPendingMinutes > 0) completedDate = null;
+    else if (record.latestPendingMinutes === 0 && !completedDate) completedDate = date;
+  }
+  if (!completed) completedDate = null;
+  const endKey = completedDate || todayKey;
+  const overdueDays = deadlineKey && endKey > deadlineKey ? daysBetween(deadlineKey, endKey) : 0;
+  return { deadlineKey, completed, completedDate, endKey, overdueDays };
+}
+
+function renderDeadlineNotice(item, processHistory = loadDailyProductionHistory().processes?.[item.id] || {}) {
+  const tracking = getDeadlineTracking(item, processHistory);
+  if (!tracking.deadlineKey) return "";
+  let message = 'Fecha compromiso original: ' + formatShortDate(item.deadlineDate);
+  if (tracking.completed) {
+    message = tracking.completedDate
+      ? 'Terminado · registrado el ' + formatShortDate(parseIsoLocalDate(tracking.completedDate)) + (tracking.overdueDays ? ' · ' + tracking.overdueDays + ' días naturales después del plazo' : ' · dentro del plazo')
+      : 'Sin pendientes en la lectura actual · fecha de terminación sin corte confirmado';
+  } else if (tracking.overdueDays) {
+    message = 'Vencido · ' + tracking.overdueDays + ' días naturales de atraso · quedan ' + formatWorkDuration(item.currentPendingMinutes) + ' pendientes. La producción sigue registrándose fuera de plazo.';
+  }
+  return '<div class="deadline-notice ' + (tracking.completed ? 'completed' : tracking.overdueDays ? 'overdue' : '') + '">' + escapeHtml(message) + '</div>';
+}
+
 function renderDailyProductionIndicators(item) {
   const plannedDays = getPlanningWorkdayDates(item);
   const archivedDates = Object.keys(historicalCuts.processes?.[item.id] || {});
@@ -898,6 +929,13 @@ function renderDailyProductionIndicators(item) {
   const history = loadDailyProductionHistory();
   const processHistory = history.processes?.[item.id] || {};
   const todayKey = projectDateKey(new Date());
+  const tracking = getDeadlineTracking(item, processHistory, todayKey);
+  const allKeys = new Set([...days.map(localDateKey), ...Object.keys(processHistory).filter(date => date <= todayKey)]);
+  if (tracking.deadlineKey && tracking.endKey > tracking.deadlineKey) {
+    for (let date = addCalendarDays(parseIsoLocalDate(tracking.deadlineKey), 1); localDateKey(date) <= tracking.endKey; date = addCalendarDays(date, 1)) allKeys.add(localDateKey(date));
+  }
+  const insideDates = [...allKeys].sort().filter(date => !tracking.deadlineKey || date <= tracking.deadlineKey);
+  const outsideDates = [...allKeys].sort().filter(date => tracking.deadlineKey && date > tracking.deadlineKey && date <= todayKey);
   const todayRecord = Object.values(processHistory).filter(record => record.dailyValid || record.baselineOnly).sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt))[0];
   const cutoffLabel = todayRecord?.observedAt
     ? `Último corte válido: ${projectDateKey(todayRecord.observedAt)} ${todayRecord.cutoffTimeUnknown ? "" : formatCutoffTime(todayRecord.observedAt)} · ${snapshotTypeLabel(todayRecord.snapshotType)}`
@@ -919,8 +957,10 @@ function renderDailyProductionIndicators(item) {
         </div>
       </div>
       <div class="daily-production-grid">
-        ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
+        ${insideDates.map((date) => renderDailyProductionDay(parseIsoLocalDate(date), todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
+      ${tracking.deadlineKey ? '<div class="deadline-divider">Fin del plazo original · ' + formatShortDate(item.deadlineDate) + '</div>' : ''}
+      ${outsideDates.length ? '<div class="after-deadline"><strong>Trabajo fuera de plazo</strong><p>Desde ' + formatShortDate(addCalendarDays(item.deadlineDate, 1)) + '. Se conserva la meta diaria original. Los días sin corte muestran “Sin dato”.</p><div class="daily-production-grid">' + outsideDates.map(date => renderDailyProductionDay(parseIsoLocalDate(date), todayKey, processHistory, item.requiredDailyMinutes)).join('') + '</div></div>' : ''}
       <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 11/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
@@ -1238,7 +1278,7 @@ function getDashboardPlanningStats(assemblyTimeStats) {
       ? null
       : today < plannedStart
         ? 0
-        : countWorkdaysInclusive(plannedStart, today > deadline ? deadline : today, plan.calendar);
+        : countWorkdaysInclusive(plannedStart, today, plan.calendar);
     const progressSinceBaselineMinutes = hasFixedBaseline
       ? Math.max(planningPendingMinutes - hours.pendingMinutes, 0)
       : null;
@@ -1261,12 +1301,13 @@ function getDashboardPlanningStats(assemblyTimeStats) {
       : null;
     const capacityStatus = !deadline || requiredDays === null
       ? "missing"
+      : hours.pendingMinutes === 0 ? "ontime"
       : forecastDate > deadline
         ? "late"
         : bufferDays <= 2
           ? "risk"
           : "ontime";
-    const status = !hasFixedBaseline ? "missing" : operationalCompliance === null
+    const status = !hasFixedBaseline ? "missing" : hours.pendingMinutes === 0 ? "ontime" : deadline && today > deadline ? "late" : operationalCompliance === null
       ? capacityStatus
       : operationalCompliance >= 100
         ? "ontime"
@@ -1370,6 +1411,7 @@ function renderDashboardPlanningRow(item) {
         </div>
       </div>
       <div class="planning-dates">
+        ${renderDeadlineNotice(item)}
         <span>Estimada <strong>${formatShortDate(item.forecastDate)}</strong></span>
         <span>Limite <strong>${formatShortDate(item.deadlineDate)}</strong></span>
       </div>

@@ -137,6 +137,18 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   storage.set('tablero-ensambles-produccion-diaria-v1', JSON.stringify({processes:{electrico:{'2026-10-03':{observedAt:'2026-10-03T23:59:00-06:00',startPendingMinutes:1,latestPendingMinutes:0}}}}));
   assert.equal(json('loadDailyProductionHistory()').processes.electrico['2026-10-03'].productionMinutes, 680);
 
+  // Calendar expiry never moves the original deadline; completion requires observed evidence.
+  run('var deadlineItem = {id:"estructurales",deadlineDate:parseIsoLocalDate("2026-10-10"),currentPendingMinutes:100};');
+  assert.equal(json('getDeadlineTracking(deadlineItem,{},"2026-10-10")').overdueDays,0);
+  assert.equal(json('getDeadlineTracking(deadlineItem,{},"2026-10-13")').overdueDays,3);
+  run('deadlineItem.currentPendingMinutes=0');
+  assert.equal(json('getDeadlineTracking(deadlineItem,{},"2026-10-13")').completedDate,null);
+  const finished=json('getDeadlineTracking(deadlineItem,{"2026-10-12":{dateValid:true,latestPendingMinutes:0}},"2026-10-15")');
+  assert.equal(finished.overdueDays,2);
+  assert.equal(finished.endKey,'2026-10-12');
+  run('deadlineItem.currentPendingMinutes=10');
+  assert.equal(json('getDeadlineTracking(deadlineItem,{"2026-10-12":{dateValid:true,latestPendingMinutes:0}},"2026-10-15")').completedDate,null);
+
   // Failure must preserve the previous complete dataset and must not record a cutoff.
   run(`render = () => {}; recordDailyProductionSnapshot = () => { throw new Error('Should not write a snapshot on failure'); };
     loadPublicSourceConfig = async () => ({avance:'https://example.org/current.csv',processSheets:{}});

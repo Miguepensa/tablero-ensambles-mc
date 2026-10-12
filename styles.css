@@ -3547,3 +3547,11 @@ button {
 .sync-status { margin: 0 0 14px; padding: 10px 14px; border-radius: 8px; background: #edf5fa; color: #244b63; font-size: 12px; overflow-wrap: anywhere; }
 .sync-error { background: #fff1e9; color: #8e351b; }
 @media (max-width: 760px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.deadline-notice { padding:10px 12px; margin:10px 0; border-radius:6px; background:#eef5fb; color:#174668; font-size:12px; }
+.deadline-notice.overdue { background:#fff0e7; color:#933900; border-left:4px solid #dd6b20; font-weight:600; }
+.deadline-notice.completed { background:#e7f5ed; color:#18633e; }
+.deadline-divider { margin-top:14px; padding:8px 0; border-top:2px dashed #8c6aba; color:#62408c; font-size:12px; font-weight:700; }
+.after-deadline { padding:12px; border:1px solid #baa1d5; border-left:4px solid #8052a6; border-radius:6px; background:#f7f2fc; }
+.after-deadline > strong { color:#62408c; font-size:13px; }
+.after-deadline > p { font-size:11px; color:#62408c; margin:6px 0; }
