@@ -921,7 +921,7 @@ function renderDailyProductionIndicators(item) {
       <div class="daily-production-grid">
         ${days.map((date) => renderDailyProductionDay(date, todayKey, processHistory, item.requiredDailyMinutes)).join("")}
       </div>
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 09/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 09 no indican hora de cierre. Los cortes del 08 y 09 son parciales. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 11/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }
