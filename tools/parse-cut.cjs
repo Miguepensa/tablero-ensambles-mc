@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('app.js','utf8').replace(/\r\n/g,'\n').replace('render();\nbootstrapData();\nscheduleDailyCutoff();','');const noop=()=>{};
+const ctx=vm.createContext({console,URL,AbortSignal,fetch,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,setInterval:noop,clearInterval:noop,localStorage:{getItem:()=>null,setItem:noop},document:{getElementById:()=>({addEventListener:noop}),querySelectorAll:()=>[],querySelector:()=>null,addEventListener:noop},window:{location:{protocol:'http:'},addEventListener:noop,setTimeout:noop,clearTimeout:noop}});vm.runInContext(source,ctx,{timeout:10000});console.log('Funciones listas');
+const kinds=['planning','avance','process:estructurales','process:talleres','process:electrico','process:hidraulico','process:pedestal','process:brazos','process:pruebas_iniciales','process:acabado_inicial','process:calidad_final'];
+vm.runInContext('var cut = createEmptyDataset()',ctx);
+for(let i=0;i<kinds.length;i++){ctx.csv=fs.readFileSync(process.argv[2]+'/'+i+'.csv','utf8');ctx.kind=kinds[i];console.log('Leyendo',ctx.kind);vm.runInContext('applyCsvToDataset(cut,kind,csv)',ctx,{timeout:10000});if(i===9){for(const id of ['pintura_detalles','acabado_final']){ctx.kind='process:'+id;vm.runInContext('applyCsvToDataset(cut,kind,csv)',ctx,{timeout:10000})}}}
+vm.runInContext('state.data = normalizeDataset(cut)',ctx,{timeout:10000});console.log('Normalizado');
+const stats=JSON.parse(vm.runInContext('JSON.stringify(getDashboardAssemblyTimeStats())',ctx,{timeout:10000}));const baseline=JSON.parse(fs.readFileSync('data/initial-balances.json'));const report=stats.map(s=>({ensamble:s.name,id:s.id,minutes:s.pendingMinutes,baseline:baseline.processes[s.id].minutes,difference:s.pendingMinutes-baseline.processes[s.id].minutes}));fs.writeFileSync(process.argv[2]+'/comparison.json',JSON.stringify(report,null,2));fs.writeFileSync(process.argv[2]+'/dataset.json',vm.runInContext('JSON.stringify(state.data)',ctx));console.log(JSON.stringify(report,null,2));console.log(vm.runInContext('JSON.stringify({units:state.data.equipos.length,definitions:Object.fromEntries(PROCESS_DEFS.map(p=>[p.id,state.data.activityDefinitions[p.id]?.length]))})',ctx));
+
+
+

@@ -1,5 +1,15 @@
 # Tablero Ensambles MC
 
+## Publicar tú mismo el corte diario
+
+En esta computadora, abre `Actualizar tablero.cmd` con doble clic desde la carpeta del proyecto. Selecciona el Excel ya guardado, indica la fecha de sus datos en formato AAAA-MM-DD y confirma la publicación. Espera el mensaje de envío correcto y uno o dos minutos para que GitHub Pages publique. Abre Control operativo y actualiza con Ctrl + F5.
+
+Este asistente publica el histórico diario compartido para todos. La lectura operativa actual sigue consultando el Google Sheets configurado: actualiza también ese documento si necesitas cambiar los indicadores actuales. Importar CSV dentro del navegador no publica el histórico compartido.
+
+Requiere esta computadora, conexión a internet y el acceso de Git a `Miguepensa/tablero-ensambles-mc`. Conserva la carpeta `.local`: contiene las actividades del corte anterior necesarias para calcular producción comparable. El asistente rechaza fechas repetidas, cortes anteriores y cambios no conciliados. Guarda el Excel con sus fórmulas calculadas antes de seleccionarlo. Si no tienes un archivo por día, el siguiente corte representa el intervalo completo; no reparte producción entre días.
+
+Los datos se publican en el tablero público. Si falla la subida después de guardar el corte, vuelve a abrir el asistente para reintentar la publicación pendiente. Si informa cambios locales pendientes, revísalos antes de continuar.
+
 ## Revisión local del 07/10/2026
 
 - La lectura operativa usa `data/sources.json` como configuración compartida. Al abrir y actualizar se consulta Drive; no se restaura la caché del dispositivo ni se mezclan hojas fallidas con lecturas anteriores. Los enlaces de Conexión son informativos y de solo lectura.

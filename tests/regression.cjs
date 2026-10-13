@@ -12,7 +12,7 @@ const context = vm.createContext({
   document: { getElementById: () => ({ addEventListener: noop }), querySelectorAll: () => [], querySelector: () => null, addEventListener: noop },
   window: { location: { protocol: 'http:' }, setTimeout: noop, clearTimeout: noop, addEventListener: noop },
 });
-const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8').replace('render();\nbootstrapData();\nscheduleDailyCutoff();', '');
+const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8').replace(/\r\n/g, '\n').replace('render();\nbootstrapData();\nscheduleDailyCutoff();', '');
 vm.runInContext(source, context);
 const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
