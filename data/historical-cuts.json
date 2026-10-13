@@ -86,6 +86,13 @@
       "filename": "AVANCE DE ENSAMBLE EH150_ABR.2026 (9).xlsx",
       "sha256": "b78104e11167dababa7f991098d2c171d208c3d89c468e3aae7eb2d935df9dda",
       "units": 171
+    },
+    {
+      "date": "2026-10-12",
+      "observedAt": "2026-10-12T12:00:00-06:00",
+      "filename": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+      "sha256": "7915f5f0525eb82a0165ed4aacf607353a38ff82aadbe614e9f7a6041de6eef5",
+      "units": 171
     }
   ],
   "processes": {
@@ -261,6 +268,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 4070,
+        "latestPendingMinutes": 3220,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 850,
+        "completedActivities": 20,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "talleres": {
@@ -434,6 +461,26 @@
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 15030,
+        "latestPendingMinutes": 15030,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
       }
     },
@@ -609,6 +656,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 12210,
+        "latestPendingMinutes": 12210,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "hidraulico": {
@@ -782,6 +849,26 @@
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 10480,
+        "latestPendingMinutes": 10480,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
       }
     },
@@ -957,6 +1044,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 12345,
+        "latestPendingMinutes": 12345,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "brazos": {
@@ -1130,6 +1237,26 @@
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 25680,
+        "latestPendingMinutes": 20740,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 4940,
+        "completedActivities": 437,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
       }
     },
@@ -1305,6 +1432,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 8420,
+        "latestPendingMinutes": 8420,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "acabado_inicial": {
@@ -1478,6 +1625,26 @@
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 18480,
+        "latestPendingMinutes": 16240,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 2240,
+        "completedActivities": 140,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
       }
     },
@@ -1653,6 +1820,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 6297,
+        "latestPendingMinutes": 6257,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 40,
+        "completedActivities": 8,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "acabado_final": {
@@ -1827,6 +2014,26 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 16875,
+        "latestPendingMinutes": 16395,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 480,
+        "completedActivities": 6,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "calidad_final": {
@@ -2000,6 +2207,26 @@
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo recibido el lunes 12 y asignado expresamente por el usuario al domingo 11 antes del inicio de la jornada del lunes. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-12": {
+        "startPendingMinutes": 27500,
+        "latestPendingMinutes": 27500,
+        "observedAt": "2026-10-12T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "AVANCE DE ENSAMBLE EH150_ABR.2026 (10).xlsx",
+        "periodStart": "2026-10-11T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo identificado por el usuario como corte del lunes 12 de octubre. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
       }
     }
