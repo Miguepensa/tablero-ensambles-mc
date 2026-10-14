@@ -20,7 +20,7 @@ for(const [folder,day,time] of cuts){
    cutContext.pid=id;
    const definitions=JSON.parse(vm.runInContext('JSON.stringify(getHoursDefinitions(PROCESS_DEFS.find(p=>p.id===pid)))',cutContext));
    for(const unit of dataset.equipos){
-    if(unit.damaged || prev.dataset.equipos.find(u=>u.id===unit.id)?.damaged)continue;
+    const excluded = unit.damaged || prev.dataset.equipos.find(u=>u.id===unit.id)?.damaged;
     if(!prev.dataset.equipos.some(u=>u.id===unit.id && u.vin===unit.vin))continue;
     const key=unit.id+':'+id, before=prev.dataset.activities[key], after=dataset.activities[key];
     if(!before||!after)throw Error('Missing activity sheet '+key);
@@ -30,6 +30,7 @@ for(const [folder,day,time] of cuts){
      cutContext.def=def;cutContext.idx=i;
      const minutes=vm.runInContext('getValidatedActivityMinutes(pid,def.name,def.minutes,idx)',cutContext);
      if(!Number.isFinite(minutes))throw Error('Invalid duration');
+     if(excluded){ record.excludedDamagedProductionMinutes ??= 0; if(a.state==='hecho' && b.state!=='hecho')record.excludedDamagedProductionMinutes+=minutes; if(b.state==='hecho' && a.state!=='hecho')record.excludedDamagedProductionMinutes-=minutes; return; }
      if(a.state==='hecho' && b.state!=='hecho'){record.productionMinutes+=minutes;record.completedActivities++;}
      if(b.state==='hecho' && a.state!=='hecho'){record.productionMinutes-=minutes;record.reopenedActivities++;}
     });

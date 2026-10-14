@@ -58,7 +58,7 @@ def prepare(source, date):
         for pid, records in after['processes'].items():
             assert {d:r for d,r in records.items() if d != date} == history['processes'][pid]
             r = records[date]
-            assert r['pendingAdjustmentMinutes'] == 0, 'Cambió el listado o saldo sin actividad comparable: '+pid
+            assert r['pendingAdjustmentMinutes'] == -r.get('excludedDamagedProductionMinutes', 0), 'Cambió el listado o saldo sin actividad comparable: '+pid
         app = (ROOT/'app.js').read_text(encoding='utf-8')
         app = re.sub(r'Cortes de Excel del 02 al \d{2}/\d{2}/\d{4}\.', 'Cortes de Excel del 02 al '+datetime.date.fromisoformat(date).strftime('%d/%m/%Y')+'.', app)
         app = app.replace('El corte del lunes 12 tampoco confirma hora de cierre.', 'Los cortes posteriores tampoco confirman hora de cierre.')

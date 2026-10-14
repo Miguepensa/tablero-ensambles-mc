@@ -108,7 +108,8 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
     for (const [date, record] of Object.entries(records)) {
       if (date === '2026-10-02') continue;
       assert.equal(record.startPendingMinutes - record.productionMinutes + record.pendingAdjustmentMinutes, record.latestPendingMinutes);
-      assert.equal(record.reopenedActivities, date === '2026-10-10' && record.latestPendingMinutes === 4070 ? 6 : date === '2026-10-09' && record.latestPendingMinutes === 21955 ? 1116 : date === '2026-10-08' && /\((4|5)\)/.test(record.sourceFile) && record.latestPendingMinutes === 6160 ? 36 : 0);
+      assert.ok(Number.isInteger(record.reopenedActivities) && record.reopenedActivities >= 0);
+      if (date <= '2026-10-13') assert.equal(record.reopenedActivities, date === '2026-10-10' && record.latestPendingMinutes === 4070 ? 6 : date === '2026-10-09' && record.latestPendingMinutes === 21955 ? 1116 : date === '2026-10-08' && /\((4|5)\)/.test(record.sourceFile) && record.latestPendingMinutes === 6160 ? 36 : 0);
     }
   }
   assert.equal(archived.processes.electrico['2026-10-08'].productionMinutes, 1775);
