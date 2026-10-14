@@ -18,6 +18,13 @@ const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
 
 (async () => {
+  const quality = json(`getQualityMilestones({activities:{a:[{name:'Llenado de documentos prueba externa',state:'hecho'}],b:[{name:'Llenado de documentos prueba externa',state:'pendiente'}]},delivered:{a:true,b:false}})`);
+  assert.deepEqual(quality, {released:1,delivered:1});
+  assert.deepEqual(json('getQualityMilestones({})'), {released:null,delivered:null});
+  run(`var qualityData=createEmptyDataset(); applyCsvToDataset(qualityData,'process:calidad_final','equipo,Llenado de documentos prueba externa,entregado\\n150-001,1,0\\n150-002,0,1');`);
+  assert.deepEqual(json('qualityData.qualityMilestones'), {released:1,delivered:1});
+  run(`applyCsvToDataset(qualityData,'process:electrico','equipo,entregado\\n150-001,1\\n150-002,1');`);
+  assert.deepEqual(json('qualityData.qualityMilestones'), {released:1,delivered:1});
   run(`initialBalances = { estructurales: { minutes: 9610, workdays: 8 } };
     state.data.planning = [{processId:'estructurales',active:true,startDate:'2026-10-03',deadline:'2026-10-10',workers:6,hoursPerDay:10,calendar:'LUN-DOM',manualPendingMinutes:999999}];
     var hours = [{id:'estructurales',pendingMinutes:8000}];`);

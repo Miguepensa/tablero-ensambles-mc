@@ -721,11 +721,13 @@ function renderDashboardView() {
   const deliveryStats = getFinishedDeliveryStats(summary);
 
   return `
-    <div class="grid metrics">
+    <div class="grid metrics dashboard-metrics">
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
+      ${renderMetric("Unidades Liberadas LAPEM", state.data.qualityMilestones?.released ?? "—", "", "terminado")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
       ${renderMetric("Siniestrado", summary.damaged, "", "siniestrado")}
+      ${renderMetric("Unidades Entregadas DJ", state.data.qualityMilestones?.delivered ?? "—", "", "terminado")}
     </div>
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
@@ -3043,6 +3045,7 @@ function applyCsvToDataset(data, kind, text) {
     const processId = kind.split(":")[1];
     const process = PROCESS_DEFS.find((item) => item.id === processId);
     const parsed = parseProcessCsv(text, process);
+    if (processId === "calidad_final") data.qualityMilestones = getQualityMilestones(parsed);
     mergeProgress(data.progress, parsed.progress);
     data.activities = { ...data.activities, ...parsed.activities };
     if (parsed.activityDefinitions?.length) {
@@ -3050,6 +3053,16 @@ function applyCsvToDataset(data, kind, text) {
     }
     data.deliveredChecks = { ...(data.deliveredChecks || {}), ...(parsed.delivered || {}) };
   }
+}
+
+function getQualityMilestones(parsed) {
+  const documents = Object.values(parsed.activities || {}).flatMap(activities =>
+    activities.filter(activity => normalizeKey(activity.name) === "llenado_de_documentos_prueba_externa"));
+  const deliveries = Object.values(parsed.delivered || {});
+  return {
+    released: documents.length ? documents.filter(activity => activity.state === "hecho").length : null,
+    delivered: deliveries.length ? deliveries.filter(isDeliveredCheckValue).length : null,
+  };
 }
 
 function importCsvFile(file, kind) {

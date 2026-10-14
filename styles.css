@@ -3555,3 +3555,6 @@ button {
 .after-deadline { padding:12px; border:1px solid #baa1d5; border-left:4px solid #8052a6; border-radius:6px; background:#f7f2fc; }
 .after-deadline > strong { color:#62408c; font-size:13px; }
 .after-deadline > p { font-size:11px; color:#62408c; margin:6px 0; }
+.metrics.dashboard-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .metrics.dashboard-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .metrics.dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
