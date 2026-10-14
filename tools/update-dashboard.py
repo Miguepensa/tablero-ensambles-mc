@@ -13,6 +13,27 @@ FILES = ['app.js', 'index.html', 'data/historical-cuts.json']
 def run(*args):
     return subprocess.check_output(args, text=True, encoding='utf-8', errors='replace', stderr=subprocess.STDOUT, timeout=180)
 
+def network_git(action):
+    while True:
+        try:
+            return run(GIT, '-c', 'http.sslBackend=openssl', action,
+                       *(['--ff-only'] if action == 'pull' else []), 'origin', 'main')
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            detail = getattr(error, 'output', '') or str(error)
+            if isinstance(detail, bytes):
+                detail = detail.decode('utf-8', errors='replace')
+            if not isinstance(error, subprocess.TimeoutExpired) and not any(
+                text in detail.lower() for text in ('could not resolve host', 'could not resolve proxy',
+                'failed to connect', 'connection timed out', 'connection was reset', 'connection reset')):
+                raise
+            stage = ('Todavía no se ha cargado el Excel ni creado un corte.' if action == 'pull'
+                     else 'El corte está guardado en esta computadora. No necesitas volver a importar el Excel.')
+            if not messagebox.askretrycancel('Sin conexión con GitHub',
+                    'No se pudo conectar con GitHub. Revisa tu conexión a internet; si usas una red de empresa, '
+                    'comprueba que permita acceder a github.com.\n\n'+stage+
+                    '\n\nCuando tengas conexión, pulsa Reintentar. Cancelar conserva tus datos.'):
+                return None
+
 def prepare(source, date):
     datetime.date.fromisoformat(date)
     history = json.loads((ROOT/FILES[2]).read_text(encoding='utf-8'))
@@ -65,11 +86,15 @@ def main():
         remote = run(GIT, 'remote', 'get-url', 'origin').strip()
         if remote != 'https://github.com/Miguepensa/tablero-ensambles-mc.git':
             raise ValueError('El destino de publicación no coincide con el tablero.')
-        print(run(GIT, '-c', 'http.sslBackend=openssl', 'pull', '--ff-only', 'origin', 'main'))
+        result = network_git('pull')
+        if result is None: return
+        print(result)
         # A prior successful commit with a failed push can be retried without reimporting.
         if run(GIT, 'log', 'origin/main..HEAD', '--oneline').strip():
             if messagebox.askyesno('Publicación pendiente', 'Hay un corte validado pendiente de subir. ¿Publicarlo ahora?'):
-                print(run(GIT, '-c', 'http.sslBackend=openssl', 'push', 'origin', 'main'))
+                result = network_git('push')
+                if result is None: return
+                print(result)
                 messagebox.showinfo('Enviado', 'La publicación fue enviada. Espera uno o dos minutos y actualiza el tablero con Ctrl + F5.')
             return
         source = filedialog.askopenfilename(title='Selecciona el Excel del corte', filetypes=[('Excel', '*.xlsx')], initialdir=str(pathlib.Path.home()/'Downloads'))
@@ -80,12 +105,16 @@ def main():
         prepare(pathlib.Path(source), date)
         print(run(GIT, 'add', '--', *FILES))
         print(run(GIT, 'commit', '-m', 'Actualiza corte '+date))
-        print(run(GIT, '-c', 'http.sslBackend=openssl', 'push', 'origin', 'main'))
+        result = network_git('push')
+        if result is None: return
+        print(result)
         messagebox.showinfo('Corte enviado', 'Corte '+date+' enviado correctamente. Espera uno o dos minutos y abre Control operativo. Actualiza con Ctrl + F5.')
     except Exception as error:
         detail = getattr(error, 'output', '') or str(error)
         print(detail)
         messagebox.showerror('No se completó la publicación', detail+'\n\nNo borres los respaldos ni repitas la importación si el corte ya quedó guardado.')
-        raise
+        return 1
+    finally:
+        root.destroy()
 
-if __name__ == '__main__': main()
+if __name__ == '__main__': sys.exit(main())
