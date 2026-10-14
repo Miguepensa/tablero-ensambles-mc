@@ -727,7 +727,7 @@ function renderDashboardView() {
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
       ${renderMetric("Siniestrado", summary.damaged, "", "siniestrado")}
-      ${renderMetric("Unidades Entregadas DJ", state.data.qualityMilestones?.delivered ?? "—", "", "terminado")}
+      ${renderMetric("Unidades Entregadas", state.data.qualityMilestones?.delivered ?? "—", "", "terminado")}
     </div>
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
