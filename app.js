@@ -12,6 +12,9 @@ const PROCESS_DEFS = [
   { id: "calidad_final", name: "Pruebas calidad/finales", sheet: "PRUEBAS CALIDADFINALES", activities: 105, color: "#003f73" },
 ];
 
+// Ocultamiento temporal de la interfaz; conserva el módulo y sus datos.
+const SHOW_FINANCE = false;
+
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "D" },
   { id: "operacion", label: "Control operativo", icon: "O" },
@@ -608,6 +611,7 @@ async function loadBundledAdvanceByUnitCsv(data, url) {
 }
 
 function render() {
+  if (!SHOW_FINANCE && state.view === "finanzas") state.view = "dashboard";
   const currentView = VIEWS.find((view) => view.id === state.view) || VIEWS[0];
   app.innerHTML = `
     <div class="app-shell">
@@ -659,7 +663,7 @@ function renderSidebar() {
         </div>
       </div>
       <nav class="nav">
-        ${VIEWS.map((view) => `
+        ${VIEWS.filter(view => SHOW_FINANCE || view.id !== "finanzas").map((view) => `
           <button class="nav-button ${state.view === view.id ? "active" : ""}" data-action="view" data-view="${view.id}">
             <span class="nav-icon">${view.icon}</span>
             <span>${view.label}</span>
@@ -707,7 +711,7 @@ function renderCurrentView() {
   if (state.view === "pdf") return renderPdfView();
   if (state.view === "horas_general") return renderHorasGeneralView();
   if (state.view === "horas") return renderHorasView();
-  if (state.view === "finanzas") return renderFinanzasView();
+  if (SHOW_FINANCE && state.view === "finanzas") return renderFinanzasView();
   if (state.view === "config") return renderConfigView();
   return renderDashboardView();
 }
@@ -2732,7 +2736,7 @@ function renderConfigView() {
           </div>
         </div>
         <div class="source-fields">
-          ${SOURCE_FIELDS.map((field) => `
+          ${SOURCE_FIELDS.filter(field => SHOW_FINANCE || field.key !== "finanzas").map((field) => `
             <label class="field">
               <span class="field-label">${field.label}</span>
               <input class="input" data-source-key="${field.key}" readonly value="${escapeAttr(state.config[field.key] || "")}" placeholder="https://docs.google.com/spreadsheets/..." />
@@ -2778,7 +2782,7 @@ function renderConfigView() {
             <option value="equipos">Equipos</option>
             <option value="avance">Avance general</option>
             <option value="materiales">Materiales</option>
-            <option value="finanzas">Finanzas</option>
+            ${SHOW_FINANCE ? '<option value="finanzas">Finanzas</option>' : ''}
             ${PROCESS_DEFS.map((process) => `<option value="process:${process.id}">${escapeHtml(process.name)}</option>`).join("")}
           </select>
         </label>
