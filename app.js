@@ -3590,10 +3590,13 @@ function normalizeDataset(data) {
     const progress = getEquipmentProgress(data, id);
     const totals = progressTotals(progress);
     const rawStatus = normalizeStatus(equipo.rawStatus);
-    const status = equipo.damaged ? "siniestrado" : rawStatus || computedStatus(equipo, totals);
+    // Preserve the original damaged unit's identity even if Drive changes its division.
+    const damaged = Boolean(equipo.damaged || id === "150-512::siniestrado-centro-sur");
+    const status = damaged ? "siniestrado" : rawStatus || computedStatus(equipo, totals);
     return {
       ...equipo,
       id,
+      damaged,
       control: equipo.control || id,
       status,
       overall: totals.percent,

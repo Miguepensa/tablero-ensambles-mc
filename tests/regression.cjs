@@ -72,6 +72,10 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.equal(summary.activeRows, 2);
   assert.equal(json("getSummary({...summaryData,equipos:summaryData.equipos.filter(e=>e.status!=='siniestrado')})").damaged, 2);
   assert.equal(summary.damaged, 2);
+  run(`var changedDivision = normalizeDataset({...createEmptyDataset(), equipos:[{id:'150-512::siniestrado-centro-sur',control:'150-512',division:'BAJA CALIFORNIA',damaged:false},{id:'150-512',control:'150-512',division:'BAJA CALIFORNIA',damaged:false}]});`);
+  assert.equal(run('changedDivision.equipos[0].status'), 'siniestrado');
+  assert.equal(run('changedDivision.equipos[0].damaged'), true);
+  assert.notEqual(run('changedDivision.equipos[1].status'), 'siniestrado');
   assert.equal(summary.finished + summary.inProgress + summary.stopped + summary.pending + summary.damaged, summary.total);
 
   assert.match(run('googleSheetsGvizUrl("https://docs.google.com/spreadsheets/d/e/example/pub?sheet=PLANEACION_ENSAMBLES")'), /sheet=PLANEACION_ENSAMBLES/);
