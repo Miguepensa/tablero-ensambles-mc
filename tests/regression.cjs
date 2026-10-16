@@ -68,7 +68,9 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   assert.notEqual(run('equipmentRowId(rows[0], "150-512", rows)'), run('equipmentRowId(rows[1], "150-512", rows)'));
   run(`var summaryData = normalizeDataset({...createEmptyDataset(),equipos:parsed.equipos,progress:parsed.progress});`);
   const summary = json('getSummary(summaryData)');
-  assert.equal(summary.total, 2);
+  assert.equal(summary.total, 172);
+  assert.equal(summary.activeRows, 2);
+  assert.equal(json("getSummary({...summaryData,equipos:summaryData.equipos.filter(e=>e.status!=='siniestrado')})").damaged, 1);
   assert.equal(summary.damaged, 1);
   assert.equal(summary.finished + summary.inProgress + summary.stopped + summary.pending + summary.damaged, summary.total);
 

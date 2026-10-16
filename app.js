@@ -683,7 +683,7 @@ function renderKicker(view) {
   const summary = getSummary(state.data);
   const source = escapeHtml(state.data.source || DEMO_SOURCE);
   const copy = {
-    dashboard: `${summary.total} unidades activas, ${summary.finished} terminadas y avance global de ${formatPercent(summary.global)}. Fuente: ${source}.`,
+    dashboard: `${summary.total} unidades del programa, ${summary.finished} terminadas y avance global de ${formatPercent(summary.global)}. Fuente: ${source}.`,
     operacion: "Planeado contra operativo, capacidad de personal y cumplimiento por ensamble.",
     divisiones: "Unidades creadas, pendientes y horas-hombre faltantes agrupadas por division.",
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
@@ -3710,8 +3710,9 @@ function getSummary(data) {
       .map((equipo) => matchKey(equipo.vin))
       .filter(Boolean)
   ).size;
-  const fixedTotal = equipos.length || Number(data.meta?.equipos) || 170;
-  const damaged = equipos.filter((equipo) => equipo.status === "siniestrado").length;
+  // Total y unidad siniestrada fijados por el usuario el 16/10/2026, independientes de las filas actuales de Drive.
+  const fixedTotal = 172;
+  const damaged = 1;
   const finishedIds = new Set(
     equipos
       .filter((equipo) => equipo.status !== "siniestrado" && progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
