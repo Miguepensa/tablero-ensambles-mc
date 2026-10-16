@@ -1,5 +1,13 @@
 # Tablero Ensambles MC
 
+## Revisión local de población operativa — 16/10/2026
+
+Las siniestradas se conservan en `excludedEquipos` para auditoría y se excluyen de `equipos`, que alimenta avances, horas, divisiones, captura, entregas y reportes. Se identifican la unidad 75 (150-416, VIN 3HAEUMMR9TL494534) y la original `150-512::siniestrado-centro-sur`. La otra 150-512 conserva su identidad activa; no se excluye por compartir VIN.
+
+La unidad 172 (150-513, fila 181 del listado general) se incluye desde el listado, aunque aún no tenga filas en las hojas de proceso. En ese caso se generan actividades pendientes a partir de las definiciones de cada proceso, se informa que faltan sus filas y se reemplazan por las reales cuando lleguen. No se hereda el avance de la unidad 75. El total se concilia con las filas identificadas: activas más excluidas, sin forzar los indicadores a un número manual.
+
+Los saldos iniciales y cortes históricos anteriores se conservan. Los nuevos cortes separan las altas/bajas del listado de la producción por actividades comparables. Las lecturas de navegador no comparan saldos de poblaciones distintas. Validación adicional: `node tests/operational-units.cjs`.
+
 ## Publicar tú mismo el corte diario
 
 En esta computadora, abre `Actualizar tablero.cmd` con doble clic desde la carpeta del proyecto. Selecciona el Excel ya guardado, indica la fecha de sus datos en formato AAAA-MM-DD y confirma la publicación. Espera el mensaje de envío correcto y uno o dos minutos para que GitHub Pages publique. Abre Control operativo y actualiza con Ctrl + F5.

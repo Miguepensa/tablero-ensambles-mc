@@ -36,6 +36,27 @@ for(const [folder,day,time] of cuts){
     });
    }
    record.pendingAdjustmentMinutes=record.latestPendingMinutes-record.startPendingMinutes+record.productionMinutes;
+   const identity = unit => unit.id+'|'+unit.vin;
+   const previousKeys = new Set(prev.dataset.equipos.map(identity));
+   const currentKeys = new Set(dataset.equipos.map(identity));
+   const added = dataset.equipos.filter(unit => !previousKeys.has(identity(unit)));
+   const removed = prev.dataset.equipos.filter(unit => !currentKeys.has(identity(unit)));
+   const pendingFor = (snapshot, unit) => {
+    const activities = snapshot.activities[unit.id+':'+id];
+    if(!activities || activities.length<definitions.length)throw Error('Cannot reconcile composition '+unit.id+':'+id+' activities='+activities?.length+' definitions='+definitions.length);
+    return definitions.reduce((sum,definition,i)=>{
+     const activity=activities[i];
+     if(activity.id!==definitions[i].id || activity.name.replace('CORROCERIA','CARROCERIA')!==definitions[i].name.replace('CORROCERIA','CARROCERIA'))throw Error('Composition schema changed '+unit.id);
+     cutContext.def=definitions[i];cutContext.idx=i;
+     const minutes=vm.runInContext('getValidatedActivityMinutes(pid,def.name,def.minutes,idx)',cutContext);
+     if(!Number.isFinite(minutes))throw Error('Invalid composition duration');
+     return sum+(activity.state==='hecho'?0:minutes);
+    },0);
+   };
+   record.compositionAdjustmentMinutes=added.reduce((sum,unit)=>sum+pendingFor(dataset,unit),0)-removed.reduce((sum,unit)=>sum+pendingFor(prev.dataset,unit),0);
+   record.addedUnitIds=added.map(unit=>unit.id);
+   record.removedUnitIds=removed.map(unit=>unit.id);
+   if(record.pendingAdjustmentMinutes!==record.compositionAdjustmentMinutes-(record.excludedDamagedProductionMinutes||0))throw Error('Unreconciled pending change '+id);
   }
   record.partial=true; record.periodStartTimeUnknown=true; record.cutoffTimeUnknown=true; record.timestampBasis="Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre."; record.excludesDamaged=true; result.processes[id][date]=record;
  }

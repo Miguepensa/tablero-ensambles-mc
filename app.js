@@ -667,7 +667,7 @@ function renderSidebar() {
           <button class="nav-button ${state.view === view.id ? "active" : ""}" data-action="view" data-view="${view.id}">
             <span class="nav-icon">${view.icon}</span>
             <span>${view.label}</span>
-            ${view.id === "equipos" ? `<span class="badge">${summary.total}</span>` : ""}
+            ${view.id === "equipos" ? `<span class="badge">${summary.activeRows}</span>` : ""}
           </button>
         `).join("")}
       </nav>
@@ -730,9 +730,10 @@ function renderDashboardView() {
       ${renderMetric("Unidades Liberadas LAPEM", state.data.qualityMilestones?.released ?? "—", "", "terminado")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
-      ${renderMetric("Siniestrado", summary.damaged, "", "siniestrado")}
+      ${renderMetric("Siniestrado", summary.damaged, "Excluidas de operación", "siniestrado")}
       ${renderMetric("Unidades Entregadas", state.data.qualityMilestones?.delivered ?? "—", "", "terminado")}
     </div>
+    ${state.data.equipos.some(unit => unit.missingProcessRows?.length) ? '<p class="sync-status">La grúa 172 (150-513) se incluye sin iniciar. Sus actividades se consideran pendientes hasta que aparezcan sus filas en las hojas de proceso de Drive.</p>' : ''}
 
     <div class="grid dashboard-grid overview-dashboard-grid" style="margin-top: 14px;">
       <section class="panel">
@@ -1033,6 +1034,7 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
   const history = loadDailyProductionHistory();
   // A suspended tab can wake days later: never backdate a fresh Drive reading.
   const dateKey = projectDateKey(new Date());
+  const populationKey = state.data.equipos.map(unit => `${unit.id}|${unit.vin}`).sort().join(";");
   const items = getDashboardPlanningStats(getDashboardAssemblyTimeStats()).filter((item) => item.planned);
 
   history.processes = history.processes || {};
@@ -1043,8 +1045,8 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
     const previousDate = parseIsoLocalDate(dateKey);
     previousDate.setDate(previousDate.getDate() - 1);
     const priorRecord = processHistory[localDateKey(previousDate)];
-    const startPendingMinutes = (existing?.dailyValid ? existing.startPendingMinutes : null)
-      ?? (priorRecord?.dateValid ? priorRecord.latestPendingMinutes : null)
+    const startPendingMinutes = (existing?.dailyValid && existing.populationKey === populationKey ? existing.startPendingMinutes : null)
+      ?? (priorRecord?.dateValid && priorRecord.populationKey === populationKey ? priorRecord.latestPendingMinutes : null)
       ?? (dateKey === INITIAL_BALANCE_DATE ? item.planningPendingMinutes : null);
 
     processHistory[dateKey] = {
@@ -1052,6 +1054,7 @@ function recordDailyProductionSnapshot(snapshotType = "automatic", requestedDate
       latestPendingMinutes: item.currentPendingMinutes,
       observedAt: new Date().toISOString(),
       snapshotType,
+      populationKey,
       dateValid: true,
       dailyValid: Number.isFinite(startPendingMinutes) && priorRecord?.snapshotType !== "historical-file",
       intervalValidated: true,
@@ -3053,7 +3056,10 @@ function applyCsvToDataset(data, kind, text) {
     const processId = kind.split(":")[1];
     const process = PROCESS_DEFS.find((item) => item.id === processId);
     const parsed = parseProcessCsv(text, process);
-    if (processId === "calidad_final") data.qualityMilestones = getQualityMilestones(parsed);
+    if (processId === "calidad_final") {
+      data.qualityMilestones = getQualityMilestones(parsed);
+      data.qualityDeliveredChecks = { ...parsed.delivered };
+    }
     mergeProgress(data.progress, parsed.progress);
     data.activities = { ...data.activities, ...parsed.activities };
     if (parsed.activityDefinitions?.length) {
@@ -3585,13 +3591,40 @@ function normalizeDataset(data) {
 
   syncEquiposFromFinance(data);
 
+  // Retain excluded source rows for audit, but use only operating units everywhere
+  // that consumes data.equipos (hours, divisions, capture, reports and progress).
+  const incomingIds = new Set((data.equipos || []).map(unit => unit.id));
+  data.equipos = [...(data.equipos || []), ...(data.excludedEquipos || []).filter(unit => !incomingIds.has(unit.id))];
+  if (new Set(data.equipos.map(unit => unit.id)).size !== data.equipos.length) {
+    throw new Error("Hay identificadores de unidad duplicados; no se puede conciliar el listado.");
+  }
+
+  // The replacement exists in the master sheet before its process rows are added.
+  // Start it at zero using the actual activity definitions, never copy unit 75.
+  const replacement = data.equipos.find(unit => unit.control === "150-513");
+  if (replacement) {
+    replacement.missingProcessRows = [];
+    PROCESS_DEFS.forEach(process => {
+      const key = `${replacement.id}:${process.id}`;
+      if (data.activities[key]?.length && !data.activities[key].every(activity => activity.inferredPending)) return;
+      const definitions = data.activityDefinitions[process.id] || [];
+      if (!definitions.length) return;
+      replacement.missingProcessRows.push(process.id);
+      data.activities[key] = definitions.map(definition => ({...definition, state:"pendiente", inferredPending:true}));
+      data.progress[replacement.id] ||= {};
+      data.progress[replacement.id][process.id] = {done:0,total:definitions.length,corrections:0,updatedAt:data.updatedAt};
+    });
+  }
+
   data.equipos = (data.equipos || []).map((equipo, index) => {
     const id = equipo.id || `EQ-${index + 1}`;
     const progress = getEquipmentProgress(data, id);
     const totals = progressTotals(progress);
     const rawStatus = normalizeStatus(equipo.rawStatus);
     // Preserve the original damaged unit's identity even if Drive changes its division.
-    const damaged = Boolean(equipo.damaged || id === "150-512::siniestrado-centro-sur");
+    const damaged = Boolean(equipo.damaged || rawStatus === "siniestrado"
+      || id === "150-512::siniestrado-centro-sur"
+      || (equipo.control === "150-416" && matchKey(equipo.vin) === matchKey("3HAEUMMR9TL494534")));
     const status = damaged ? "siniestrado" : rawStatus || computedStatus(equipo, totals);
     return {
       ...equipo,
@@ -3603,6 +3636,16 @@ function normalizeDataset(data) {
       updatedAt: newestDate(progress) || equipo.updatedAt || data.updatedAt,
     };
   });
+
+  data.excludedEquipos = data.equipos.filter(unit => unit.damaged);
+  data.equipos = data.equipos.filter(unit => !unit.damaged);
+  if (data.qualityDeliveredChecks) {
+    const activeIds = new Set(data.equipos.map(unit => unit.id));
+    data.qualityMilestones = getQualityMilestones({
+      activities:Object.fromEntries(data.equipos.map(unit => [unit.id, data.activities[`${unit.id}:calidad_final`] || []])),
+      delivered:Object.fromEntries(Object.entries(data.qualityDeliveredChecks).filter(([id]) => activeIds.has(id))),
+    });
+  }
 
   data.equipos.forEach((equipo) => {
     data.progress[equipo.id] = data.progress[equipo.id] || {};
@@ -3717,9 +3760,8 @@ function getSummary(data) {
       .map((equipo) => matchKey(equipo.vin))
       .filter(Boolean)
   ).size;
-  // Total y dos unidades siniestradas fijados por el usuario el 16/10/2026, independientes de las filas actuales de Drive.
-  const fixedTotal = 172;
-  const damaged = 2;
+  const damaged = (data.excludedEquipos || []).length;
+  const fixedTotal = equipos.length + damaged;
   const finishedIds = new Set(
     equipos
       .filter((equipo) => equipo.status !== "siniestrado" && progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)
@@ -3755,13 +3797,14 @@ function getSummary(data) {
 
 function getDeliveredCount(data) {
   const delivered = new Set();
+  const activeIds = new Set((data.equipos || []).map(unit => unit.id));
 
   Object.entries(data.deliveredChecks || {}).forEach(([id, value]) => {
-    if (isDeliveredCheckValue(value)) delivered.add(id);
+    if (activeIds.has(id) && isDeliveredCheckValue(value)) delivered.add(id);
   });
 
   (data.finanzas || []).forEach((row) => {
-    if (!hasDeliveredCheck(row.fields || row)) return;
+    if (!activeIds.has(row.equipoId) || !hasDeliveredCheck(row.fields || row)) return;
     delivered.add(row.equipoId || row.almacen || row.vin || row.id);
   });
 
