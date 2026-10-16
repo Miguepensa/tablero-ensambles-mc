@@ -18,6 +18,9 @@ const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
 
 (async () => {
+  assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES,OBSERVACIONES\\nestructurales,NINGUNA,Observaciones de prueba')[0].notes`), 'Observaciones de prueba');
+  assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES,OBSERVACIONES\\nestructurales,NINGUNA,')[0].notes`), '');
+  assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES\\nestructurales,Nota original')[0].notes`), 'Nota original');
   run(`var noteRow={id:'estructurales',name:'Estructural',currentPendingMinutes:0,notes:'Revisión <externa>\\nPendiente firma',capacityStatus:'ontime',requiredDays:0,availableDays:8,ratio:0,requiredDailyMinutes:60,capacityMinutes:60};`);
   assert.match(run('renderDashboardPlanningRow(noteRow)'), /planning-ribbon/);
   assert.match(run('renderDashboardPlanningRow(noteRow)'), /Revisión &lt;externa&gt;/);

@@ -3130,7 +3130,10 @@ function parsePlanningCsv(text) {
       hoursPerDay: Math.max(0, toNumber(readField(row, ["horas_jornada", "jornada", "horas_dia"]))),
       calendar: normalizePlanningCalendar(readField(row, ["calendario"])),
       active: ["si", "sí", "true", "1", "x", "activo"].includes(normalizeText(readField(row, ["activo", "activa"]))),
-      notes: readField(row, ["observaciones", "notas"]),
+      notes: (() => {
+        const keys = Object.keys(row).filter(key => /^observaciones(?:_\d+)?$/.test(key));
+        return keys.length ? row[keys[keys.length - 1]] : readField(row, ["notas"]);
+      })(),
       manualPendingMinutes,
     };
   }).filter((item) => item.processId && PROCESS_DEFS.some((process) => process.id === item.processId));
