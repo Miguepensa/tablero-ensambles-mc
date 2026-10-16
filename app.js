@@ -3710,9 +3710,9 @@ function getSummary(data) {
       .map((equipo) => matchKey(equipo.vin))
       .filter(Boolean)
   ).size;
-  // Total y unidad siniestrada fijados por el usuario el 16/10/2026, independientes de las filas actuales de Drive.
+  // Total y dos unidades siniestradas fijados por el usuario el 16/10/2026, independientes de las filas actuales de Drive.
   const fixedTotal = 172;
-  const damaged = 1;
+  const damaged = 2;
   const finishedIds = new Set(
     equipos
       .filter((equipo) => equipo.status !== "siniestrado" && progressTotals(getEquipmentProgress(data, equipo.id)).percent >= 99.5)

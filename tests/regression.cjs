@@ -70,8 +70,8 @@ const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
   const summary = json('getSummary(summaryData)');
   assert.equal(summary.total, 172);
   assert.equal(summary.activeRows, 2);
-  assert.equal(json("getSummary({...summaryData,equipos:summaryData.equipos.filter(e=>e.status!=='siniestrado')})").damaged, 1);
-  assert.equal(summary.damaged, 1);
+  assert.equal(json("getSummary({...summaryData,equipos:summaryData.equipos.filter(e=>e.status!=='siniestrado')})").damaged, 2);
+  assert.equal(summary.damaged, 2);
   assert.equal(summary.finished + summary.inProgress + summary.stopped + summary.pending + summary.damaged, summary.total);
 
   assert.match(run('googleSheetsGvizUrl("https://docs.google.com/spreadsheets/d/e/example/pub?sheet=PLANEACION_ENSAMBLES")'), /sheet=PLANEACION_ENSAMBLES/);
