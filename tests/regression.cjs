@@ -18,6 +18,13 @@ const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
 
 (async () => {
+  run(`var noteRow={id:'estructurales',name:'Estructural',currentPendingMinutes:0,notes:'Revisión <externa>\\nPendiente firma',capacityStatus:'ontime',requiredDays:0,availableDays:8,ratio:0,requiredDailyMinutes:60,capacityMinutes:60};`);
+  assert.match(run('renderDashboardPlanningRow(noteRow)'), /planning-ribbon/);
+  assert.match(run('renderDashboardPlanningRow(noteRow)'), /Revisión &lt;externa&gt;/);
+  run('noteRow.currentPendingMinutes=5; noteRow.notes="  "');
+  assert.doesNotMatch(run('renderDashboardPlanningRow(noteRow)'), /planning-ribbon|planning-observations/);
+  run('noteRow.currentPendingMinutes=null');
+  assert.doesNotMatch(run('renderDashboardPlanningRow(noteRow)'), /planning-ribbon/);
   const quality = json(`getQualityMilestones({activities:{a:[{name:'Llenado de documentos prueba externa',state:'hecho'}],b:[{name:'Llenado de documentos prueba externa',state:'pendiente'}]},delivered:{a:true,b:false}})`);
   assert.deepEqual(quality, {released:1,delivered:1});
   assert.deepEqual(json('getQualityMilestones({})'), {released:null,delivered:null});

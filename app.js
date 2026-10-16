@@ -1380,6 +1380,8 @@ function renderDashboardPlanning(items) {
 }
 
 function renderDashboardPlanningRow(item) {
+  const completed = Number.isFinite(item.currentPendingMinutes) && item.currentPendingMinutes === 0;
+  const notes = String(item.notes || "").trim();
   const status = item.capacityStatus || "missing";
   const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Fuera de fecha", missing: "Dato incompleto" };
   const required = item.requiredDays === null ? "-" : item.requiredDays;
@@ -1389,7 +1391,8 @@ function renderDashboardPlanningRow(item) {
   const dailyCapacity = item.capacityMinutes > 0 ? formatWorkDuration(item.capacityMinutes) : "-";
 
   return `
-    <article class="planning-row planning-row-link ${status}" data-action="open-operational-process" data-process="${escapeAttr(item.id)}" role="button" tabindex="0" aria-label="Abrir control operativo de ${escapeAttr(item.name)}">
+    <article class="planning-row planning-row-link ${status}${completed ? " planning-completed" : ""}" data-action="open-operational-process" data-process="${escapeAttr(item.id)}" role="button" tabindex="0" aria-label="Abrir control operativo de ${escapeAttr(item.name)}">
+      ${completed ? '<div class="planning-ribbon"><span>Terminado</span></div>' : ''}
       <div class="planning-name">
         <strong>${escapeHtml(item.name)}</strong>
         <span>${item.workers} ${item.workers === 1 ? "trabajador" : "trabajadores"} · ${item.hoursPerDay} h/jornada</span>
@@ -1398,6 +1401,7 @@ function renderDashboardPlanningRow(item) {
           <strong>Saldo al ${formatShortDate(item.baselineDate)}</strong>
           <strong class="mono">Saldo ${formatWorkDuration(item.planningPendingMinutes)}</strong>
         </span>
+        ${notes ? `<div class="planning-observations"><strong>Observaciones</strong><p>${escapeHtml(notes)}</p></div>` : ''}
       </div>
       <div class="planning-bar-area">
         <div class="planning-bar-labels">
