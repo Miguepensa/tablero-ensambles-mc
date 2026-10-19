@@ -121,6 +121,13 @@
       "filename": "AVANCE DE ENSAMBLE EH150_ABR.2026 (15).xlsx",
       "sha256": "e803874cfd8027e9118798bd555d6e632ee7871f698c3d1f36e4184c3601ffae",
       "units": 171
+    },
+    {
+      "date": "2026-10-17",
+      "observedAt": "2026-10-17T12:00:00-06:00",
+      "filename": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+      "sha256": "f41f6cd7ab0e739f4566439ec59d824c0ae4ceeaf5829de0abc6a5e413b69904",
+      "units": 170
     }
   ],
   "processes": {
@@ -393,6 +400,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 0,
+        "latestPendingMinutes": 955,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 955,
+        "compositionAdjustmentMinutes": 955,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
@@ -674,6 +709,34 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 6935,
+        "latestPendingMinutes": 7220,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 480,
+        "completedActivities": 96,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 765,
+        "compositionAdjustmentMinutes": 765,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "electrico": {
@@ -945,6 +1008,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 7575,
+        "latestPendingMinutes": 7775,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 330,
+        "completedActivities": 37,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 530,
+        "compositionAdjustmentMinutes": 530,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
@@ -1226,6 +1317,34 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 7220,
+        "latestPendingMinutes": 7905,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": -445,
+        "completedActivities": 114,
+        "reopenedActivities": 124,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 240,
+        "compositionAdjustmentMinutes": 240,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "pedestal": {
@@ -1497,6 +1616,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 8075,
+        "latestPendingMinutes": 8425,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 350,
+        "compositionAdjustmentMinutes": 350,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
@@ -1778,6 +1925,34 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 19525,
+        "latestPendingMinutes": 20270,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 105,
+        "completedActivities": 11,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 850,
+        "compositionAdjustmentMinutes": 850,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "pruebas_iniciales": {
@@ -2049,6 +2224,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 8320,
+        "latestPendingMinutes": 7720,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 600,
+        "completedActivities": 124,
+        "reopenedActivities": 4,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "compositionAdjustmentMinutes": 0,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
@@ -2330,6 +2533,34 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 15200,
+        "latestPendingMinutes": 14880,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 780,
+        "completedActivities": 57,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 460,
+        "compositionAdjustmentMinutes": 460,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "pintura_detalles": {
@@ -2601,6 +2832,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 3674,
+        "latestPendingMinutes": 3536,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 225,
+        "completedActivities": 15,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 87,
+        "compositionAdjustmentMinutes": 87,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
@@ -2882,6 +3141,34 @@
         "cutoffTimeUnknown": true,
         "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
         "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 12365,
+        "latestPendingMinutes": 12305,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 575,
+        "completedActivities": 27,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 515,
+        "compositionAdjustmentMinutes": 515,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
       }
     },
     "calidad_final": {
@@ -3153,6 +3440,34 @@
         "reopenedActivities": 0,
         "baselineOnly": false,
         "pendingAdjustmentMinutes": 0,
+        "partial": true,
+        "periodStartTimeUnknown": true,
+        "cutoffTimeUnknown": true,
+        "timestampBasis": "Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre.",
+        "excludesDamaged": true
+      },
+      "2026-10-17": {
+        "startPendingMinutes": 27500,
+        "latestPendingMinutes": 27500,
+        "observedAt": "2026-10-17T12:00:00-06:00",
+        "snapshotType": "historical-file",
+        "intervalValidated": true,
+        "dailyValid": true,
+        "sourceFile": "Copia de AVANCE DE ENSAMBLE EH150_ABR.2026 - 17 de octubre, 12_09.xlsx",
+        "periodStart": "2026-10-16T12:00:00-06:00",
+        "productionMinutes": 0,
+        "completedActivities": 0,
+        "reopenedActivities": 0,
+        "baselineOnly": false,
+        "pendingAdjustmentMinutes": 0,
+        "compositionAdjustmentMinutes": 0,
+        "addedUnitIds": [
+          "150-513"
+        ],
+        "removedUnitIds": [
+          "150-416",
+          "150-512::siniestrado-centro-sur"
+        ],
         "partial": true,
         "periodStartTimeUnknown": true,
         "cutoffTimeUnknown": true,
