@@ -3128,8 +3128,19 @@ function parseEquiposCsv(text) {
 }
 
 function parsePlanningCsv(text) {
-  return csvToRecords(text).map((row) => {
-    const processId = normalizeKey(readField(row, ["id_ensamble", "id", "proceso"]));
+  const rows = nonEmptyCsvRows(text);
+  const headerIndex = rows.findIndex(row => {
+    const keys = row.map(normalizeKey);
+    return keys.includes("id_ensamble") || (keys.includes("ensamble") && keys.includes("fecha_limite"));
+  });
+  if (headerIndex < 0) return [];
+  const headers = uniqueHeaders(rows[headerIndex]);
+  return rows.slice(headerIndex + 1).map(values => Object.fromEntries(headers.map((key, index) => [key, String(values[index] ?? "").trim()]))).map((row) => {
+    // A missing ID heading must not turn a data row or an observation into a header.
+    const rawId = row.id_ensamble || row.id || row.proceso || row.col_1;
+    const matchedProcess = PROCESS_DEFS.find(item => item.id === normalizeKey(rawId || ""))
+      || PROCESS_DEFS.find(item => normalizeKey(item.name) === normalizeKey(row.ensamble || ""));
+    const processId = matchedProcess?.id || "";
     const process = PROCESS_DEFS.find((item) => item.id === processId);
     const manualPendingMinutes = parseHoursMinutesInput(readField(row, ["horas_pendientes", "horas_pendiente"]));
     return {

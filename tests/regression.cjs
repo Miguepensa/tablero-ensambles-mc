@@ -18,6 +18,11 @@ const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
 
 (async () => {
+  run(`var planningFixture = [' ,ENSAMBLE,FECHA_INICIO,FECHA_LIMITE,TRABAJADORES,HORAS_JORNADA,CALENDARIO,ACTIVO,OBSERVACIONES', ...PROCESS_DEFS.map(p => [p.id,p.name,'3/10/2026','24/10/2026',4,10,'LUN-DOM','SI','Proceso con avance pausado'].join(','))].join('\\n');`);
+  assert.equal(run('parsePlanningCsv(planningFixture).length'), 11);
+  run('state.data.planning=parsePlanningCsv(planningFixture); var allPlans=getDashboardPlanningStats(PROCESS_DEFS.map(p=>({...p,pendingMinutes:60})));');
+  assert.equal(run('allPlans.filter(p=>p.planned).length'), 11);
+  assert.equal((run('renderDashboardPlanning(allPlans)').match(/class="planning-row/g) || []).length, 11);
   assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES,OBSERVACIONES\\nestructurales,NINGUNA,Observaciones de prueba')[0].notes`), 'Observaciones de prueba');
   assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES,OBSERVACIONES\\nestructurales,NINGUNA,')[0].notes`), '');
   assert.equal(run(`parsePlanningCsv('ID_ENSAMBLE,OBSERVACIONES\\nestructurales,Nota original')[0].notes`), 'Nota original');
