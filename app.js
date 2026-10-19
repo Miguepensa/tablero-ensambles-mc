@@ -14,6 +14,7 @@ const PROCESS_DEFS = [
 
 // Ocultamiento temporal de la interfaz; conserva el módulo y sus datos.
 const SHOW_FINANCE = false;
+const FINANCE_DIRECT_ACCESS = new URL(window.location.href || "http://localhost/").searchParams.get("view") === "finanzas";
 
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "D" },
@@ -107,7 +108,7 @@ let autoRefreshTimer = null;
 let dailyCutoffTimer = null;
 
 let state = {
-  view: "dashboard",
+  view: FINANCE_DIRECT_ACCESS ? "finanzas" : "dashboard",
   operationalProcess: "",
   query: "",
   selectedId: null,
@@ -416,7 +417,7 @@ async function loadDriveData(options = {}) {
     state.selectedId = imported.equipos.some((equipo) => equipo.id === previousSelectedId)
       ? previousSelectedId
       : imported.equipos[0]?.id || null;
-    state.view = keepView ? previousView : "dashboard";
+    state.view = keepView || FINANCE_DIRECT_ACCESS ? previousView : "dashboard";
     state.toast = imported.loadErrors?.length
       ? `Datos actualizados con avisos: ${imported.loadErrors.join(" / ")}`
       : `${background ? "Actualizacion automatica" : "Datos actualizados"}: ${imported.equipos.length} equipos.`;
@@ -611,7 +612,7 @@ async function loadBundledAdvanceByUnitCsv(data, url) {
 }
 
 function render() {
-  if (!SHOW_FINANCE && state.view === "finanzas") state.view = "dashboard";
+  if (!SHOW_FINANCE && !FINANCE_DIRECT_ACCESS && state.view === "finanzas") state.view = "dashboard";
   const currentView = VIEWS.find((view) => view.id === state.view) || VIEWS[0];
   app.innerHTML = `
     <div class="app-shell">
@@ -711,7 +712,7 @@ function renderCurrentView() {
   if (state.view === "pdf") return renderPdfView();
   if (state.view === "horas_general") return renderHorasGeneralView();
   if (state.view === "horas") return renderHorasView();
-  if (SHOW_FINANCE && state.view === "finanzas") return renderFinanzasView();
+  if ((SHOW_FINANCE || FINANCE_DIRECT_ACCESS) && state.view === "finanzas") return renderFinanzasView();
   if (state.view === "config") return renderConfigView();
   return renderDashboardView();
 }
