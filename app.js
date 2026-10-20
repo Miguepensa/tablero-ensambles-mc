@@ -758,11 +758,9 @@ function renderDashboardView() {
   return `
     <div class="grid metrics dashboard-metrics">
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
-      ${renderMetric("Unidades Liberadas LAPEM", state.data.qualityMilestones?.released ?? "—", "", "terminado")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
       ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
       ${renderMetric("Siniestrado", summary.damaged, "Excluidas de operación", "siniestrado")}
-      ${renderMetric("Unidades Entregadas", state.data.qualityMilestones?.delivered ?? "—", "", "terminado")}
     </div>
     ${state.data.equipos.some(unit => unit.missingProcessRows?.length) ? '<p class="sync-status">La grúa 172 (150-513) se incluye sin iniciar. Sus actividades se consideran pendientes hasta que aparezcan sus filas en las hojas de proceso de Drive.</p>' : ''}
 
@@ -5241,7 +5239,10 @@ function parseMcProcessRows(rows, process) {
   const activityStart = findActivityStartColumn(headerRow, dataRows);
   const deliveredColumn = findDeliveredColumn(headerRow, groupRow);
   const trackingColumns = process.id === "calidad_final"
-    ? QUALITY_TRACKING_FIELDS.map(field => ({ ...field, col: headerRow.findIndex(label => normalizeKey(label) === field.header) })) : [];
+    ? QUALITY_TRACKING_FIELDS.map(field => ({ ...field, col: headerRow.findIndex(label => {
+      const key = normalizeKey(label);
+      return key === field.header || key.endsWith(`_${field.header}`);
+    }) })) : [];
   const trackingColumnSet = new Set(trackingColumns.filter(field => field.col >= 0).map(field => field.col));
   const qualityTracking = { available: trackingColumns.filter(field => field.col >= 0).map(field => field.key), units: {}, unitNumbers: {} };
   const activityColumns = [];

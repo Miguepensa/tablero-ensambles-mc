@@ -3555,8 +3555,8 @@ button {
 .after-deadline { padding:12px; border:1px solid #baa1d5; border-left:4px solid #8052a6; border-radius:6px; background:#f7f2fc; }
 .after-deadline > strong { color:#62408c; font-size:13px; }
 .after-deadline > p { font-size:11px; color:#62408c; margin:6px 0; }
-.metrics.dashboard-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-@media (max-width: 1200px) { .metrics.dashboard-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.metrics.dashboard-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .metrics.dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .metrics.dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .planning-row-link { position: relative; }
 .planning-observations { margin-top: 8px; padding: 8px 10px; background: #fff8e8; border-left: 3px solid #d69b30; border-radius: 4px; font-size: 12px; color: #654b20; overflow-wrap: anywhere; }
