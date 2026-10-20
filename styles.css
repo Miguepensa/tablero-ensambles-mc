@@ -3565,3 +3565,19 @@ button {
 .planning-ribbon { position: absolute; right: 0; top: 0; width: 100px; height: 100px; overflow: hidden; pointer-events: none; }
 .planning-ribbon span { position: absolute; top: 24px; right: -34px; width: 150px; padding: 6px 0; transform: rotate(45deg); text-align: center; background: #168654; color: white; font-size: 11px; font-weight: 700; letter-spacing: .4px; box-shadow: 0 2px 4px #0002; }
 
+.tracking-chart-card { cursor:pointer; transition:box-shadow .15s, border-color .15s; }
+.tracking-chart-card:hover, .tracking-chart-card:focus-visible { border-color:#1f78b8; box-shadow:0 5px 20px #124b7420; outline:2px solid #1f78b8; outline-offset:2px; }
+.tracking-chart-layout { display:flex; align-items:center; gap:28px; padding:16px 0; }
+.tracking-chart-layout .legend { flex:1; }
+.tracking-pie { width:180px; height:180px; border-radius:50%; flex-shrink:0; box-shadow:inset 0 0 0 1px #00000008; }
+.tracking-pie-empty { display:grid; place-items:center; color:#526579; font-size:14px; }
+.tracking-note { color:#526579; font-size:12px; line-height:1.6; margin:12px 0 4px; }
+.tracking-metrics { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+.tracking-metric { cursor:pointer; text-align:left; font:inherit; display:flex; flex-direction:column; gap:14px; }
+.tracking-metric strong { font-size:36px; font-weight:600; }
+.tracking-metric.selected { border-color:#1f78b8; background:#eef7ff; }
+.tracking-metric:focus-visible { outline:2px solid #1f78b8; }
+.tracking-filters { display:flex; flex-wrap:wrap; gap:16px; align-items:end; margin:18px 0; }
+.tracking-filters .field { min-width:240px; flex:1; }
+.tracking-table th, .tracking-table td { white-space:nowrap; }
+@media(max-width:760px) { .tracking-chart-layout { flex-direction:column; align-items:stretch; } .tracking-pie { align-self:center; } .tracking-filters .field { min-width:0; } }

@@ -14,11 +14,22 @@ const PROCESS_DEFS = [
 
 // Ocultamiento temporal de la interfaz; conserva el módulo y sus datos.
 const SHOW_FINANCE = false;
+const QUALITY_TRACKING_FIELDS = [
+  { key: "mexico", header: "lapem_mexico", label: "LAPEM México", color: "#1f78b8" },
+  { key: "irapuato", header: "lapem_irapuato", label: "LAPEM Irapuato", color: "#bd7c26" },
+  { key: "completo", header: "lapem_completo", label: "LAPEM completo", color: "#278b64" },
+  { key: "transito", header: "unidades_en_transito", label: "En tránsito", color: "#1f78b8" },
+  { key: "almacen", header: "unidades_en_almacen_cfe", label: "En almacén CFE", color: "#278b64" },
+  { key: "curso", header: "unidades_curso", label: "Con curso", color: "#bd7c26" },
+  { key: "acuse", header: "unidades_con_acuse_de_recibo", label: "Con acuse de recibido", color: "#8057ad" },
+];
 const FINANCE_DIRECT_ACCESS = new URL(window.location.href || "http://localhost/").searchParams.get("view") === "finanzas";
 
 const VIEWS = [
   { id: "dashboard", label: "Dashboard", icon: "D" },
   { id: "operacion", label: "Control operativo", icon: "O" },
+  { id: "liberacion", label: "Liberación de unidades", icon: "L" },
+  { id: "entrega", label: "Entrega de unidades", icon: "T" },
   { id: "divisiones", label: "Divisiones", icon: "V" },
   { id: "equipos", label: "Equipos", icon: "E" },
   { id: "detalle", label: "Detalle", icon: "U" },
@@ -110,6 +121,8 @@ let dailyCutoffTimer = null;
 let state = {
   view: FINANCE_DIRECT_ACCESS ? "finanzas" : "dashboard",
   operationalProcess: "",
+  trackingFilter: "todos",
+  trackingQuery: "",
   query: "",
   selectedId: null,
   captureProcess: "estructurales",
@@ -150,6 +163,12 @@ app.addEventListener("click", (event) => {
   const action = target.dataset.action;
   if (action === "view") {
     state.view = target.dataset.view;
+    state.trackingFilter = "todos";
+    state.trackingQuery = "";
+    render();
+  }
+  if (action === "tracking-filter") {
+    state.trackingFilter = target.dataset.filter;
     render();
   }
 
@@ -271,6 +290,14 @@ app.addEventListener("click", (event) => {
 
 app.addEventListener("input", (event) => {
   const target = event.target;
+  if (target.matches("[data-tracking-query]")) {
+    const cursor = target.selectionStart;
+    state.trackingQuery = target.value;
+    render();
+    const input = document.querySelector("[data-tracking-query]");
+    input?.focus();
+    input?.setSelectionRange(cursor, cursor);
+  }
   if (target.matches("[data-filter]")) {
     state.filters[target.dataset.filter] = target.value;
     render();
@@ -330,7 +357,7 @@ app.addEventListener("input", (event) => {
 });
 
 app.addEventListener("keydown", (event) => {
-  if (!event.target.matches('[data-action="open-hours-process"], [data-action="open-operational-process"]')) return;
+  if (!event.target.matches('[data-action="open-hours-process"], [data-action="open-operational-process"], [data-action="view"][role="button"]')) return;
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   event.target.click();
@@ -690,6 +717,8 @@ function renderKicker(view) {
   const copy = {
     dashboard: `${summary.total} unidades del programa, ${summary.finished} terminadas y avance global de ${formatPercent(summary.global)}. Fuente: ${source}.`,
     operacion: "Planeado contra operativo, capacidad de personal y cumplimiento por ensamble.",
+    liberacion: "Checks de LAPEM México e Irapuato por grúa, desde Pruebas calidad/finales.",
+    entrega: "Tránsito, almacén CFE, curso y acuse de recibido por grúa, desde Pruebas calidad/finales.",
     divisiones: "Unidades creadas, pendientes y horas-hombre faltantes agrupadas por division.",
     equipos: "Busqueda por unidad, VIN, division, entrega o estatus.",
     detalle: "Avance por proceso, cobertura de actividades y datos principales de la unidad.",
@@ -704,6 +733,7 @@ function renderKicker(view) {
 }
 
 function renderCurrentView() {
+  if (state.view === "liberacion" || state.view === "entrega") return renderQualityTrackingView(state.view);
   if (state.view === "operacion") return renderOperationalControlView();
   if (state.view === "divisiones") return renderDivisionesView();
   if (state.view === "equipos") return renderEquiposView();
@@ -769,6 +799,7 @@ function renderDashboardView() {
       </section>
     </div>
 
+    ${renderQualityTrackingDashboard()}
     <div class="grid process-dashboard-stack" style="margin-top: 14px;">
       <section class="panel process-focus-panel">
         <div class="panel-header">
@@ -786,6 +817,74 @@ function renderDashboardView() {
 
     ${renderDashboardAssemblyTimes(assemblyTimeStats)}
   `;
+}
+
+function getQualityTrackingSummary(kind) {
+  const fields = QUALITY_TRACKING_FIELDS.filter(field => kind === "liberacion"
+    ? ["mexico", "irapuato"].includes(field.key) : ["transito", "almacen", "curso", "acuse"].includes(field.key));
+  const source = state.data.qualityTracking;
+  const available = fields.every(field => source?.available?.includes(field.key));
+  const rows = state.data.equipos.map(unit => ({ ...unit, consecutivo: source?.unitNumbers?.[unit.id] || "", checks: source?.units?.[unit.id] || null }));
+  const count = predicate => rows.filter(row => row.checks && predicate(row.checks)).length;
+  const counts = Object.fromEntries(fields.map(field => [field.key, count(checks => checks[field.key])]));
+  counts.ambas = count(checks => checks.mexico && checks.irapuato);
+  const items = kind === "liberacion" ? [
+    { key: "solo_mexico", label: "Solo LAPEM México", count: count(checks => checks.mexico && !checks.irapuato), color: "#1f78b8" },
+    { key: "solo_irapuato", label: "Solo LAPEM Irapuato", count: count(checks => checks.irapuato && !checks.mexico), color: "#bd7c26" },
+    { key: "ambas", label: "Ambas liberaciones", count: counts.ambas, color: "#278b64" },
+  ] : fields.map(field => ({ ...field, count: counts[field.key] }));
+  return { fields, rows, available, counts, items,
+    marked: count(checks => fields.some(field => checks[field.key])),
+    unmarked: count(checks => fields.every(field => !checks[field.key])),
+    missing: rows.filter(row => !row.checks).length };
+}
+
+function renderQualityTrackingPie(items) {
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  let offset = 0;
+  const stops = items.filter(item => item.count > 0).map(item => {
+    const start = offset;
+    offset += item.count / total * 100;
+    return `${item.color} ${start}% ${offset}%`;
+  });
+  return `<div class="tracking-pie ${total ? "" : "tracking-pie-empty"}" style="background:${total ? `conic-gradient(${stops.join(",")})` : "#e4eaf0"}" role="img" aria-label="${escapeAttr(items.map(item => `${item.label}: ${item.count}`).join("; "))}">${total ? "" : "Sin checks"}</div>`;
+}
+
+function renderQualityTrackingDashboard() {
+  return `<div class="grid dashboard-grid tracking-dashboard" style="margin-top:14px">${["liberacion", "entrega"].map(kind => {
+    const stats = getQualityTrackingSummary(kind);
+    const title = kind === "liberacion" ? "Liberación de unidades" : "Entrega de unidades";
+    return `<section class="panel tracking-chart-card" role="button" tabindex="0" data-action="view" data-view="${kind}" aria-label="Abrir ${title}">
+      <div class="panel-header"><div><p class="panel-label">Pruebas calidad/finales</p><h2 class="panel-title">${title}</h2></div><span class="badge">Ver unidades →</span></div>
+      ${stats.available ? `<div class="tracking-chart-layout">${renderQualityTrackingPie(stats.items)}<div class="legend">${stats.items.map(item => renderLegendRow(item.label, `${item.count} grúas`, item.color)).join("")}</div></div>
+      <p class="tracking-note">${kind === "liberacion" ? `${stats.marked} grúas con liberación registrada. México e Irapuato se cuentan una sola vez en «Ambas».` : `${stats.marked} grúas con algún check de entrega. Los sectores representan checks; una grúa puede aparecer en varios.`}</p>
+      <p class="small">${stats.unmarked} grúas sin checks${stats.missing ? ` · ${stats.missing} sin registro en esta hoja` : ""}.</p>`
+      : '<p class="empty-state">Los checks todavía no están disponibles en la lectura de Drive.</p>'}
+    </section>`;
+  }).join("")}</div>`;
+}
+
+function renderQualityTrackingView(kind) {
+  const stats = getQualityTrackingSummary(kind);
+  if (!stats.available) return '<section class="panel"><p class="empty-state">Los checks todavía no están disponibles. Actualiza la lectura de Drive.</p></section>';
+  const filters = [...stats.fields.map(field => ({ ...field, count: stats.counts[field.key] }))];
+  if (kind === "liberacion") filters.push({ key: "ambas", label: "Ambas liberaciones", count: stats.counts.ambas, color: "#278b64" });
+  const query = normalizeText(state.trackingQuery);
+  const rows = stats.rows.filter(row => {
+    const matchesCheck = state.trackingFilter === "todos" || (state.trackingFilter === "ambas"
+      ? row.checks?.mexico && row.checks?.irapuato : row.checks?.[state.trackingFilter]);
+    return matchesCheck && (!query || [row.consecutivo, row.control, row.vin, row.division].some(value => normalizeText(value).includes(query)));
+  });
+  const checkCell = value => value === undefined ? '<span class="small">Sin registro</span>' : value
+    ? '<span class="badge terminado">✓ Sí</span>' : '<span class="small">Pendiente</span>';
+  return `<div class="grid tracking-metrics">${filters.map(item => `<button class="panel tracking-metric ${state.trackingFilter === item.key ? "selected" : ""}" data-action="tracking-filter" data-filter="${item.key}" aria-pressed="${state.trackingFilter === item.key}"><span class="panel-label">${item.label}</span><strong>${item.count}</strong><span class="small">Ver grúas con este check</span></button>`).join("")}</div>
+    <section class="panel" style="margin-top:14px">
+      <div class="panel-header"><div><h2 class="panel-title">Detalle por grúa</h2><p class="tracking-note">${kind === "liberacion" ? 'Los totales de México e Irapuato incluyen las grúas con ambas liberaciones. «Ambas» requiere los dos checks.' : 'Cada columna muestra su check independiente; no se presupone que una etapa anterior esté completada.'} Las siniestradas están excluidas.</p></div><span class="badge">${rows.length} grúas</span></div>
+      <div class="filters tracking-filters"><button class="ghost-button" data-action="tracking-filter" data-filter="todos" aria-pressed="${state.trackingFilter === "todos"}">Todas las grúas</button><label class="field"><span class="field-label">Buscar grúa, almacén, VIN o división</span><input class="input" data-tracking-query value="${escapeAttr(state.trackingQuery)}" placeholder="Ejemplo: 150-342" /></label><span class="badge">${state.trackingFilter === "todos" ? "Todas" : filters.find(item => item.key === state.trackingFilter)?.label || ""}</span></div>
+      <div class="table-wrap"><table class="data-table tracking-table"><thead><tr><th>Grúa</th><th>N.º almacén</th><th>VIN</th><th>División</th>${stats.fields.map(field => `<th>${field.label}</th>`).join("")}${kind === "liberacion" ? "<th>Ambas liberaciones</th>" : ""}</tr></thead><tbody>
+      ${rows.length ? rows.map(row => `<tr><td>${escapeHtml(row.consecutivo || "—")}</td><td><button class="ghost-button" data-action="select-equipo" data-id="${escapeAttr(row.id)}">${escapeHtml(row.control)}</button></td><td>${escapeHtml(row.vin || "—")}</td><td>${escapeHtml(row.division || "—")}</td>${stats.fields.map(field => `<td>${checkCell(row.checks?.[field.key])}</td>`).join("")}${kind === "liberacion" ? `<td>${checkCell(row.checks ? row.checks.mexico && row.checks.irapuato : undefined)}</td>` : ""}</tr>`).join("") : `<tr><td colspan="${4 + stats.fields.length + (kind === "liberacion" ? 1 : 0)}" class="empty-state">No hay grúas con este filtro.</td></tr>`}
+      </tbody></table></div>
+    </section>`;
 }
 
 function renderOperationalControlView() {
@@ -3058,6 +3157,7 @@ function applyCsvToDataset(data, kind, text) {
     const process = PROCESS_DEFS.find((item) => item.id === processId);
     const parsed = parseProcessCsv(text, process);
     if (processId === "calidad_final") {
+      data.qualityTracking = parsed.qualityTracking || null;
       data.qualityMilestones = getQualityMilestones(parsed);
       data.qualityDeliveredChecks = { ...parsed.delivered };
     }
@@ -5140,11 +5240,15 @@ function parseMcProcessRows(rows, process) {
   const dataRows = rows.slice(firstDataIndex).filter((row) => findEquipmentColumn(row) >= 0);
   const activityStart = findActivityStartColumn(headerRow, dataRows);
   const deliveredColumn = findDeliveredColumn(headerRow, groupRow);
+  const trackingColumns = process.id === "calidad_final"
+    ? QUALITY_TRACKING_FIELDS.map(field => ({ ...field, col: headerRow.findIndex(label => normalizeKey(label) === field.header) })) : [];
+  const trackingColumnSet = new Set(trackingColumns.filter(field => field.col >= 0).map(field => field.col));
+  const qualityTracking = { available: trackingColumns.filter(field => field.col >= 0).map(field => field.key), units: {}, unitNumbers: {} };
   const activityColumns = [];
   const maxColumns = Math.max(headerRow.length, groupRow.length, ...dataRows.map((row) => row.length));
 
   for (let col = activityStart; col < maxColumns; col += 1) {
-    if (col === deliveredColumn) continue;
+    if (col === deliveredColumn || trackingColumnSet.has(col)) continue;
     const label = headerRow[col] || groupRow[col] || "";
     const hasActivityValue = dataRows.some((row) => isActivityCellValue(row[col]));
     if (isActivityHeaderLabel(label) || hasActivityValue) {
@@ -5170,6 +5274,8 @@ function parseMcProcessRows(rows, process) {
     const control = row[equipoCol];
     if (!isEquipmentCode(control)) return;
     const equipoId = equipmentRowId(row, control, rows);
+    if (trackingColumns.length) qualityTracking.units[equipoId] = Object.fromEntries(trackingColumns.filter(field => field.col >= 0).map(field => [field.key, isDeliveredCheckValue(row[field.col])]));
+    if (trackingColumns.length) qualityTracking.unitNumbers[equipoId] = String(row[0] || "").trim();
     if (deliveredColumn >= 0) delivered[equipoId] = isDeliveredCheckValue(row[deliveredColumn]);
 
     let done = 0;
@@ -5197,7 +5303,7 @@ function parseMcProcessRows(rows, process) {
     activities[`${equipoId}:${process.id}`] = rowActivities;
   });
 
-  return { progress, activities, activityDefinitions, delivered };
+  return { progress, activities, activityDefinitions, delivered, qualityTracking };
 }
 
 function findProcessDataStartIndex(rows) {
