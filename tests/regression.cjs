@@ -18,6 +18,10 @@ const run = code => vm.runInContext(code, context);
 const json = code => JSON.parse(run('JSON.stringify(' + code + ')'));
 
 (async () => {
+  run(`var shiftedColumns=Array.from({length:63},(_,i)=>({label:'Actividad '+i}));shiftedColumns[35].label='CALCOMANIAS DE CONTROL SUPERIOR';shiftedColumns[47].label='CAJA PORTA HERRAMIENTAS 2 PZAS';shiftedColumns.splice(21,0,{label:'COLOCACION DE CANASTINAS'});`);
+  assert.equal(run("getProcessActivityColumns('acabado_inicial',shiftedColumns).length"),36);
+  assert.equal(run("getProcessActivityColumns('pintura_detalles',shiftedColumns).length"),12);
+  assert.equal(run("getProcessActivityColumns('acabado_final',shiftedColumns).length"),16);
   run(`var planningFixture = [' ,ENSAMBLE,FECHA_INICIO,FECHA_LIMITE,TRABAJADORES,HORAS_JORNADA,CALENDARIO,ACTIVO,OBSERVACIONES', ...PROCESS_DEFS.map(p => [p.id,p.name,'3/10/2026','24/10/2026',4,10,'LUN-DOM','SI','Proceso con avance pausado'].join(','))].join('\\n');`);
   assert.equal(run('parsePlanningCsv(planningFixture).length'), 11);
   run('state.data.planning=parsePlanningCsv(planningFixture); var allPlans=getDashboardPlanningStats(PROCESS_DEFS.map(p=>({...p,pendingMinutes:60})));');

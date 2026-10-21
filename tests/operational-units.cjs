@@ -19,6 +19,8 @@ run(`var fixture=createEmptyDataset(); fixture.equipos=[
 assert.deepEqual(json('state.data.equipos.map(u=>u.id)'),['150-512','150-513']);
 assert.deepEqual(json('state.data.excludedEquipos.map(u=>u.id)'),['150-416','150-512::siniestrado-centro-sur']);
 const s=json('getSummary(state.data)');
+assert.equal(s.unfinished,1);
+assert.equal(s.finished+s.unfinished+s.damaged,s.total,'dashboard cards include pending units exactly once');
 assert.equal(s.total,4);assert.equal(s.finished,1);assert.equal(s.pending,1);assert.equal(s.damaged,2);assert.equal(s.delivered,1);
 assert.deepEqual(json('state.data.qualityMilestones'),{released:1,delivered:1});
 assert.equal(run('state.data.equipos[1].missingProcessRows.length'),11);

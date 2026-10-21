@@ -17,7 +17,7 @@ const SHOW_FINANCE = false;
 const QUALITY_TRACKING_FIELDS = [
   { key: "mexico", header: "lapem_mexico", label: "LAPEM México", color: "#1f78b8" },
   { key: "irapuato", header: "lapem_irapuato", label: "LAPEM Irapuato", color: "#bd7c26" },
-  { key: "completo", header: "lapem_completo", label: "LAPEM completo", color: "#278b64" },
+  { key: "ambas", header: "liberacion_lapem", aliases: ["lapem_completo", "ambas_inspecciones"], label: "Ambas inspecciones", color: "#278b64" },
   { key: "transito", header: "unidades_en_transito", label: "En tránsito", color: "#1f78b8" },
   { key: "almacen", header: "unidades_en_almacen_cfe", label: "En almacén CFE", color: "#278b64" },
   { key: "curso", header: "unidades_curso", label: "Con curso", color: "#bd7c26" },
@@ -759,7 +759,7 @@ function renderDashboardView() {
     <div class="grid metrics dashboard-metrics">
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
-      ${renderMetric("En proceso", summary.inProgress, "", "en-proceso")}
+      ${renderMetric("En proceso", summary.unfinished, "Incluye unidades pendientes de iniciar", "en-proceso")}
       ${renderMetric("Siniestrado", summary.damaged, "Excluidas de operación", "siniestrado")}
     </div>
     ${state.data.equipos.some(unit => unit.missingProcessRows?.length) ? '<p class="sync-status">La grúa 172 (150-513) se incluye sin iniciar. Sus actividades se consideran pendientes hasta que aparezcan sus filas en las hojas de proceso de Drive.</p>' : ''}
@@ -819,7 +819,7 @@ function renderDashboardView() {
 
 function getQualityTrackingSummary(kind) {
   const fields = QUALITY_TRACKING_FIELDS.filter(field => kind === "liberacion"
-    ? ["mexico", "irapuato"].includes(field.key) : ["transito", "almacen", "curso", "acuse"].includes(field.key));
+    ? ["mexico", "irapuato", "ambas"].includes(field.key) : ["transito", "almacen", "curso", "acuse"].includes(field.key));
   const source = state.data.qualityTracking;
   const available = fields.every(field => source?.available?.includes(field.key));
   const rows = state.data.equipos.map(unit => {
@@ -831,12 +831,7 @@ function getQualityTrackingSummary(kind) {
   });
   const count = predicate => rows.filter(row => row.checks && predicate(row.checks)).length;
   const counts = Object.fromEntries(fields.map(field => [field.key, count(checks => checks[field.key])]));
-  counts.ambas = count(checks => checks.mexico && checks.irapuato);
-  const items = kind === "liberacion" ? [
-    { key: "solo_mexico", label: "Solo LAPEM México", count: count(checks => checks.mexico && !checks.irapuato), color: "#1f78b8" },
-    { key: "solo_irapuato", label: "Solo LAPEM Irapuato", count: count(checks => checks.irapuato && !checks.mexico), color: "#bd7c26" },
-    { key: "ambas", label: "Ambas liberaciones", count: counts.ambas, color: "#278b64" },
-  ] : fields.map(field => ({ ...field, count: counts[field.key] }));
+  const items = fields.map(field => ({ ...field, count: counts[field.key] }));
   return { fields, rows, available, counts, items,
     marked: count(checks => fields.some(field => checks[field.key])),
     unmarked: count(checks => fields.every(field => !checks[field.key])),
@@ -860,9 +855,7 @@ function renderQualityTrackingDashboard() {
     const title = kind === "liberacion" ? "Liberación de unidades" : "Entrega de unidades";
     return `<section class="panel tracking-chart-card" role="button" tabindex="0" data-action="view" data-view="${kind}" aria-label="Abrir ${title}">
       <div class="panel-header"><div><p class="panel-label">Pruebas calidad/finales</p><h2 class="panel-title">${title}</h2></div><span class="badge">Ver unidades →</span></div>
-      ${stats.available ? `<div class="tracking-chart-layout">${renderQualityTrackingPie(stats.items)}<div class="legend">${stats.items.map(item => renderLegendRow(item.label, `${item.count} grúas`, item.color)).join("")}</div></div>
-      <p class="tracking-note">${kind === "liberacion" ? `${stats.marked} grúas con liberación registrada. México e Irapuato se cuentan una sola vez en «Ambas».` : `${stats.marked} grúas con algún check de entrega. Almacén CFE tiene prioridad sobre tránsito. Curso y acuse pueden coincidir con otros estados.`}</p>
-      <p class="small">${stats.unmarked} grúas sin checks${stats.missing ? ` · ${stats.missing} sin registro en esta hoja` : ""}.</p>`
+      ${stats.available ? `<div class="tracking-chart-layout">${renderQualityTrackingPie(stats.items)}<div class="legend">${stats.items.map(item => renderLegendRow(item.label, `${item.count} grúas`, item.color)).join("")}</div></div>`
       : '<p class="empty-state">Los checks todavía no están disponibles en la lectura de Drive.</p>'}
     </section>`;
   }).join("")}</div>`;
@@ -872,21 +865,19 @@ function renderQualityTrackingView(kind) {
   const stats = getQualityTrackingSummary(kind);
   if (!stats.available) return '<section class="panel"><p class="empty-state">Los checks todavía no están disponibles. Actualiza la lectura de Drive.</p></section>';
   const filters = [...stats.fields.map(field => ({ ...field, count: stats.counts[field.key] }))];
-  if (kind === "liberacion") filters.push({ key: "ambas", label: "Ambas liberaciones", count: stats.counts.ambas, color: "#278b64" });
   const query = normalizeText(state.trackingQuery);
   const rows = stats.rows.filter(row => {
-    const matchesCheck = state.trackingFilter === "todos" || (state.trackingFilter === "ambas"
-      ? row.checks?.mexico && row.checks?.irapuato : row.checks?.[state.trackingFilter]);
+    const matchesCheck = state.trackingFilter === "todos" || row.checks?.[state.trackingFilter];
     return matchesCheck && (!query || [row.consecutivo, row.control, row.vin, row.division].some(value => normalizeText(value).includes(query)));
   });
   const checkCell = value => value === undefined ? '<span class="small">Sin registro</span>' : value
     ? '<span class="badge terminado">✓ Sí</span>' : '<span class="small">Pendiente</span>';
   return `<div class="grid tracking-metrics">${filters.map(item => `<button class="panel tracking-metric ${state.trackingFilter === item.key ? "selected" : ""}" data-action="tracking-filter" data-filter="${item.key}" aria-pressed="${state.trackingFilter === item.key}"><span class="panel-label">${item.label}</span><strong>${item.count}</strong><span class="small">Ver grúas con este check</span></button>`).join("")}</div>
     <section class="panel" style="margin-top:14px">
-      <div class="panel-header"><div><h2 class="panel-title">Detalle por grúa</h2><p class="tracking-note">${kind === "liberacion" ? 'Los totales de México e Irapuato incluyen las grúas con ambas liberaciones. «Ambas» requiere los dos checks.' : 'Una grúa en almacén CFE ya no cuenta en tránsito, aunque ambos checks estén marcados en Drive. Curso y acuse conservan sus checks independientes.'} Las siniestradas están excluidas.</p></div><span class="badge">${rows.length} grúas</span></div>
+      <div class="panel-header"><div><h2 class="panel-title">Detalle por grúa</h2></div><span class="badge">${rows.length} grúas</span></div>
       <div class="filters tracking-filters"><button class="ghost-button" data-action="tracking-filter" data-filter="todos" aria-pressed="${state.trackingFilter === "todos"}">Todas las grúas</button><label class="field"><span class="field-label">Buscar grúa, almacén, VIN o división</span><input class="input" data-tracking-query value="${escapeAttr(state.trackingQuery)}" placeholder="Ejemplo: 150-342" /></label><span class="badge">${state.trackingFilter === "todos" ? "Todas" : filters.find(item => item.key === state.trackingFilter)?.label || ""}</span></div>
-      <div class="table-wrap"><table class="data-table tracking-table"><thead><tr><th>Grúa</th><th>N.º almacén</th><th>VIN</th><th>División</th>${stats.fields.map(field => `<th>${field.label}</th>`).join("")}${kind === "liberacion" ? "<th>Ambas liberaciones</th>" : ""}</tr></thead><tbody>
-      ${rows.length ? rows.map(row => `<tr><td>${escapeHtml(row.consecutivo || "—")}</td><td><button class="ghost-button" data-action="select-equipo" data-id="${escapeAttr(row.id)}">${escapeHtml(row.control)}</button></td><td>${escapeHtml(row.vin || "—")}</td><td>${escapeHtml(row.division || "—")}</td>${stats.fields.map(field => `<td>${checkCell(row.checks?.[field.key])}</td>`).join("")}${kind === "liberacion" ? `<td>${checkCell(row.checks ? row.checks.mexico && row.checks.irapuato : undefined)}</td>` : ""}</tr>`).join("") : `<tr><td colspan="${4 + stats.fields.length + (kind === "liberacion" ? 1 : 0)}" class="empty-state">No hay grúas con este filtro.</td></tr>`}
+      <div class="table-wrap"><table class="data-table tracking-table"><thead><tr><th>Grúa</th><th>N.º almacén</th><th>VIN</th><th>División</th>${stats.fields.map(field => `<th>${field.label}</th>`).join("")}</tr></thead><tbody>
+      ${rows.length ? rows.map(row => `<tr><td>${escapeHtml(row.consecutivo || "—")}</td><td><button class="ghost-button" data-action="select-equipo" data-id="${escapeAttr(row.id)}">${escapeHtml(row.control)}</button></td><td>${escapeHtml(row.vin || "—")}</td><td>${escapeHtml(row.division || "—")}</td>${stats.fields.map(field => `<td>${checkCell(row.checks?.[field.key])}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${4 + stats.fields.length}" class="empty-state">No hay grúas con este filtro.</td></tr>`}
       </tbody></table></div>
     </section>`;
 }
@@ -942,8 +933,6 @@ function renderOperationalControlCard(item, index = 0) {
   const dailyTarget = Number.isFinite(item.requiredDailyMinutes) ? formatWorkDuration(item.requiredDailyMinutes) : "-";
   const operationalDaily = Number.isFinite(item.operationalDailyMinutes) ? formatWorkDuration(item.operationalDailyMinutes) : "-";
   const dailyCapacity = item.capacityMinutes > 0 ? formatWorkDuration(item.capacityMinutes) : "-";
-  const compliance = Number.isFinite(item.operationalCompliance) ? Math.max(0, item.operationalCompliance) : null;
-  const complianceWidth = compliance === null ? 0 : clamp(compliance, 0, 100);
   const staffingDifference = Number.isFinite(item.requiredWorkers) ? item.workers - item.requiredWorkers : null;
   const staffingMessage = staffingDifference === null
     ? "Falta completar jornada o fechas"
@@ -988,13 +977,6 @@ function renderOperationalControlCard(item, index = 0) {
         <div><span>Personal asignado</span><strong>${item.workers}</strong></div>
         <div><span>Personal requerido</span><strong>${item.requiredWorkers ?? "-"}</strong></div>
         <p>${staffingMessage}</p>
-      </div>
-
-      <div class="operation-compliance ${item.status}">
-        <div><span>Cumplimiento operativo</span><strong>${compliance === null ? "-" : `${Math.round(compliance)}%`}</strong></div>
-        <div class="operation-compliance-track" role="img" aria-label="Cumplimiento operativo ${compliance === null ? "sin dato" : `${Math.round(compliance)} por ciento`}">
-          <span style="width: ${complianceWidth}%"></span>
-        </div>
       </div>
 
       ${renderDailyProductionIndicators(item)}
@@ -1072,7 +1054,7 @@ function renderDailyProductionIndicators(item) {
       </div>
       ${tracking.deadlineKey ? '<div class="deadline-divider">Fin del plazo original · ' + formatShortDate(item.deadlineDate) + '</div>' : ''}
       ${outsideDates.length ? '<div class="after-deadline"><strong>Trabajo fuera de plazo</strong><p>Desde ' + formatShortDate(addCalendarDays(item.deadlineDate, 1)) + '. Se conserva la meta diaria original. Los días sin corte muestran “Sin dato”.</p><div class="daily-production-grid">' + outsideDates.map(date => renderDailyProductionDay(parseIsoLocalDate(date), todayKey, processHistory, item.requiredDailyMinutes)).join('') + '</div></div>' : ''}
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 19/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. Los cortes posteriores tampoco confirman hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 21/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. Los cortes posteriores tampoco confirman hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }
@@ -1104,7 +1086,7 @@ function renderDailyProductionDay(date, todayKey, processHistory, targetMinutes)
   const weekday = date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "").slice(0, 3);
   const detail = `${weekday} ${formatShortDate(date)} · ${statusText} · ${productionMinutes === null ? "sin lectura" : `${formatWorkDuration(productionMinutes)} producidas`}`;
   const intervalDetail = record?.periodStart
-    ? ' · Desde ' + projectDateKey(record.periodStart) + ' ' + (record.periodStartTimeUnknown ? 'hora no confirmada' : formatCutoffTime(record.periodStart)) + ' hasta ' + projectDateKey(record.observedAt) + ' ' + (record.cutoffTimeUnknown ? 'hora no confirmada' : formatCutoffTime(record.observedAt)) + '. Avance entre cortes, no jornada completa.' + (record.pendingAdjustmentMinutes ? ' Ajuste de pendientes por unidades excluidas o cambios del listado: ' + record.pendingAdjustmentMinutes + ' min; excluido de producción.' : '')
+    ? ' · Desde ' + projectDateKey(record.periodStart) + ' ' + (record.periodStartTimeUnknown ? 'hora no confirmada' : formatCutoffTime(record.periodStart)) + ' hasta ' + projectDateKey(record.observedAt) + ' ' + (record.cutoffTimeUnknown ? 'hora no confirmada' : formatCutoffTime(record.observedAt)) + '. Avance entre cortes, no jornada completa.' + (record.pendingAdjustmentMinutes ? ' Ajuste de pendientes por cambios de unidades o actividades: ' + record.pendingAdjustmentMinutes + ' min; excluido de producción.' : '')
     : '';
   const cutoffDetail = record?.observedAt
     ? ` · lectura ${projectDateKey(record.observedAt)} ${record.cutoffTimeUnknown ? "hora no confirmada" : formatCutoffTime(record.observedAt)} (${snapshotTypeLabel(record.snapshotType)})${record.validationNote ? " · " + record.validationNote : ""}`
@@ -3897,6 +3879,7 @@ function getSummary(data) {
     activeRows: equipos.length,
     damaged,
     finished,
+    unfinished: equipos.length - finished,
     stopped,
     delivered,
     pending,
@@ -5247,7 +5230,7 @@ function parseMcProcessRows(rows, process) {
   const trackingColumns = process.id === "calidad_final"
     ? QUALITY_TRACKING_FIELDS.map(field => ({ ...field, col: headerRow.findIndex(label => {
       const key = normalizeKey(label);
-      return key === field.header || key.endsWith(`_${field.header}`);
+      return [field.header, ...(field.aliases || [])].some(header => key === header || key.endsWith(`_${header}`));
     }) })) : [];
   const trackingColumnSet = new Set(trackingColumns.filter(field => field.col >= 0).map(field => field.col));
   const qualityTracking = { available: trackingColumns.filter(field => field.col >= 0).map(field => field.key), units: {}, unitNumbers: {} };
@@ -5325,9 +5308,13 @@ function findProcessDataStartIndex(rows) {
 }
 
 function getProcessActivityColumns(processId, columns) {
-  if (processId === "acabado_inicial") return columns.slice(0, 35);
-  if (processId === "pintura_detalles") return columns.slice(35, 47);
-  if (processId === "acabado_final") return columns.slice(47, 63);
+  const paintingStart = columns.findIndex(item => normalizeKey(item.label) === "calcomanias_de_control_superior");
+  const finalStart = columns.findIndex(item => normalizeKey(item.label) === "caja_porta_herramientas_2_pzas");
+  const firstBoundary = paintingStart >= 0 ? paintingStart : 35;
+  const secondBoundary = finalStart >= 0 ? finalStart : 47;
+  if (processId === "acabado_inicial") return columns.slice(0, firstBoundary);
+  if (processId === "pintura_detalles") return columns.slice(firstBoundary, secondBoundary);
+  if (processId === "acabado_final") return columns.slice(secondBoundary);
   return columns;
 }
 

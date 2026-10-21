@@ -19,21 +19,35 @@ for(const [folder,day,time] of cuts){
   if(prev){
    cutContext.pid=id;
    const definitions=JSON.parse(vm.runInContext('JSON.stringify(getHoursDefinitions(PROCESS_DEFS.find(p=>p.id===pid)))',cutContext));
+
+   cutContext.fixture=prev.dataset;vm.runInContext('state.data=fixture',cutContext);
+   const previousDefinitions=JSON.parse(vm.runInContext('JSON.stringify(getHoursDefinitions(PROCESS_DEFS.find(p=>p.id===pid)))',cutContext));
+   cutContext.fixture=dataset;vm.runInContext('state.data=fixture',cutContext);
+   const activityMap=(snapshot,unit,defs)=>{
+    const activities=snapshot.activities[unit.id+':'+id];if(!activities)throw Error('Missing activities '+unit.id+':'+id);
+    const occurrences=new Map(),map=new Map();
+    defs.forEach((def,i)=>{
+     const activity=activities.find(a=>a.id===def.id);if(!activity)throw Error('Missing activity '+def.id);
+     const name=def.name.replace('CORROCERIA','CARROCERIA');const ordinal=(occurrences.get(name)||0)+1;occurrences.set(name,ordinal);
+     cutContext.def=def;cutContext.idx=i;const minutes=vm.runInContext('getValidatedActivityMinutes(pid,def.name,def.minutes,idx)',cutContext);
+     if(!Number.isFinite(minutes))throw Error('Invalid duration '+def.id);
+     map.set(name+'::'+ordinal,{...activity,minutes});
+    });return map;
+   };
+   record.schemaAdjustmentMinutes=0;
    for(const unit of dataset.equipos){
-    const excluded = unit.damaged || prev.dataset.equipos.find(u=>u.id===unit.id)?.damaged;
-    if(!prev.dataset.equipos.some(u=>u.id===unit.id && u.vin===unit.vin))continue;
-    const key=unit.id+':'+id, before=prev.dataset.activities[key], after=dataset.activities[key];
-    if(!before||!after)throw Error('Missing activity sheet '+key);
-    definitions.forEach((def,i)=>{
-     const a=after[i],b=before[i];
-     if(!a||!b||a.id!==b.id||a.name.replace('CORROCERIA','CARROCERIA')!==b.name.replace('CORROCERIA','CARROCERIA')||a.minutes!==b.minutes)throw Error('Activity schema changed '+key);
-     cutContext.def=def;cutContext.idx=i;
-     const minutes=vm.runInContext('getValidatedActivityMinutes(pid,def.name,def.minutes,idx)',cutContext);
-     if(!Number.isFinite(minutes))throw Error('Invalid duration');
-     if(excluded){ record.excludedDamagedProductionMinutes ??= 0; if(a.state==='hecho' && b.state!=='hecho')record.excludedDamagedProductionMinutes+=minutes; if(b.state==='hecho' && a.state!=='hecho')record.excludedDamagedProductionMinutes-=minutes; return; }
-     if(a.state==='hecho' && b.state!=='hecho'){record.productionMinutes+=minutes;record.completedActivities++;}
-     if(b.state==='hecho' && a.state!=='hecho'){record.productionMinutes-=minutes;record.reopenedActivities++;}
-    });
+    const previousUnit=prev.dataset.equipos.find(u=>u.id===unit.id && u.vin===unit.vin);if(!previousUnit)continue;
+    const excluded=unit.damaged||previousUnit.damaged;
+    const before=activityMap(prev.dataset,previousUnit,previousDefinitions),after=activityMap(dataset,unit,definitions);
+    for(const [key,a] of after){
+     const b=before.get(key);
+     if(!b){record.schemaAdjustmentMinutes+=a.state==='hecho'?0:a.minutes;continue;}
+     if(a.minutes!==b.minutes)throw Error('Activity duration changed '+unit.id+':'+key);
+     if(excluded){record.excludedDamagedProductionMinutes??=0;if(a.state==='hecho'&&b.state!=='hecho')record.excludedDamagedProductionMinutes+=a.minutes;if(b.state==='hecho'&&a.state!=='hecho')record.excludedDamagedProductionMinutes-=a.minutes;continue;}
+     if(a.state==='hecho'&&b.state!=='hecho'){record.productionMinutes+=a.minutes;record.completedActivities++;}
+     if(b.state==='hecho'&&a.state!=='hecho'){record.productionMinutes-=a.minutes;record.reopenedActivities++;}
+    }
+    for(const [key,b] of before)if(!after.has(key))record.schemaAdjustmentMinutes-=b.state==='hecho'?0:b.minutes;
    }
    record.pendingAdjustmentMinutes=record.latestPendingMinutes-record.startPendingMinutes+record.productionMinutes;
    const identity = unit => unit.id+'|'+unit.vin;
@@ -41,22 +55,11 @@ for(const [folder,day,time] of cuts){
    const currentKeys = new Set(dataset.equipos.map(identity));
    const added = dataset.equipos.filter(unit => !previousKeys.has(identity(unit)));
    const removed = prev.dataset.equipos.filter(unit => !currentKeys.has(identity(unit)));
-   const pendingFor = (snapshot, unit) => {
-    const activities = snapshot.activities[unit.id+':'+id];
-    if(!activities || activities.length<definitions.length)throw Error('Cannot reconcile composition '+unit.id+':'+id+' activities='+activities?.length+' definitions='+definitions.length);
-    return definitions.reduce((sum,definition,i)=>{
-     const activity=activities[i];
-     if(activity.id!==definitions[i].id || activity.name.replace('CORROCERIA','CARROCERIA')!==definitions[i].name.replace('CORROCERIA','CARROCERIA'))throw Error('Composition schema changed '+unit.id);
-     cutContext.def=definitions[i];cutContext.idx=i;
-     const minutes=vm.runInContext('getValidatedActivityMinutes(pid,def.name,def.minutes,idx)',cutContext);
-     if(!Number.isFinite(minutes))throw Error('Invalid composition duration');
-     return sum+(activity.state==='hecho'?0:minutes);
-    },0);
-   };
+   const pendingFor = (snapshot, unit) => [...activityMap(snapshot,unit,snapshot===dataset?definitions:previousDefinitions).values()].reduce((sum,a)=>sum+(a.state==='hecho'?0:a.minutes),0);
    record.compositionAdjustmentMinutes=added.reduce((sum,unit)=>sum+pendingFor(dataset,unit),0)-removed.reduce((sum,unit)=>sum+pendingFor(prev.dataset,unit),0);
    record.addedUnitIds=added.map(unit=>unit.id);
    record.removedUnitIds=removed.map(unit=>unit.id);
-   if(record.pendingAdjustmentMinutes!==record.compositionAdjustmentMinutes-(record.excludedDamagedProductionMinutes||0))throw Error('Unreconciled pending change '+id);
+   if(record.pendingAdjustmentMinutes!==record.compositionAdjustmentMinutes+record.schemaAdjustmentMinutes-(record.excludedDamagedProductionMinutes||0))throw Error('Unreconciled pending change '+id);
   }
   record.partial=true; record.periodStartTimeUnknown=true; record.cutoffTimeUnknown=true; record.timestampBasis="Archivo asignado por el usuario a la fecha del corte. Hora 12:00 usada solo como referencia técnica de fecha, no como hora de cierre."; record.excludesDamaged=true; result.processes[id][date]=record;
  }
