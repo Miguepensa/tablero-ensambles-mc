@@ -822,7 +822,13 @@ function getQualityTrackingSummary(kind) {
     ? ["mexico", "irapuato"].includes(field.key) : ["transito", "almacen", "curso", "acuse"].includes(field.key));
   const source = state.data.qualityTracking;
   const available = fields.every(field => source?.available?.includes(field.key));
-  const rows = state.data.equipos.map(unit => ({ ...unit, consecutivo: source?.unitNumbers?.[unit.id] || "", checks: source?.units?.[unit.id] || null }));
+  const rows = state.data.equipos.map(unit => {
+    const rawChecks = source?.units?.[unit.id];
+    const checks = rawChecks ? { ...rawChecks } : null;
+    // Warehouse arrival ends transit, without changing the source checkboxes.
+    if (kind === "entrega" && checks?.almacen) checks.transito = false;
+    return { ...unit, consecutivo: source?.unitNumbers?.[unit.id] || "", checks };
+  });
   const count = predicate => rows.filter(row => row.checks && predicate(row.checks)).length;
   const counts = Object.fromEntries(fields.map(field => [field.key, count(checks => checks[field.key])]));
   counts.ambas = count(checks => checks.mexico && checks.irapuato);
@@ -855,7 +861,7 @@ function renderQualityTrackingDashboard() {
     return `<section class="panel tracking-chart-card" role="button" tabindex="0" data-action="view" data-view="${kind}" aria-label="Abrir ${title}">
       <div class="panel-header"><div><p class="panel-label">Pruebas calidad/finales</p><h2 class="panel-title">${title}</h2></div><span class="badge">Ver unidades →</span></div>
       ${stats.available ? `<div class="tracking-chart-layout">${renderQualityTrackingPie(stats.items)}<div class="legend">${stats.items.map(item => renderLegendRow(item.label, `${item.count} grúas`, item.color)).join("")}</div></div>
-      <p class="tracking-note">${kind === "liberacion" ? `${stats.marked} grúas con liberación registrada. México e Irapuato se cuentan una sola vez en «Ambas».` : `${stats.marked} grúas con algún check de entrega. Los sectores representan checks; una grúa puede aparecer en varios.`}</p>
+      <p class="tracking-note">${kind === "liberacion" ? `${stats.marked} grúas con liberación registrada. México e Irapuato se cuentan una sola vez en «Ambas».` : `${stats.marked} grúas con algún check de entrega. Almacén CFE tiene prioridad sobre tránsito. Curso y acuse pueden coincidir con otros estados.`}</p>
       <p class="small">${stats.unmarked} grúas sin checks${stats.missing ? ` · ${stats.missing} sin registro en esta hoja` : ""}.</p>`
       : '<p class="empty-state">Los checks todavía no están disponibles en la lectura de Drive.</p>'}
     </section>`;
@@ -877,7 +883,7 @@ function renderQualityTrackingView(kind) {
     ? '<span class="badge terminado">✓ Sí</span>' : '<span class="small">Pendiente</span>';
   return `<div class="grid tracking-metrics">${filters.map(item => `<button class="panel tracking-metric ${state.trackingFilter === item.key ? "selected" : ""}" data-action="tracking-filter" data-filter="${item.key}" aria-pressed="${state.trackingFilter === item.key}"><span class="panel-label">${item.label}</span><strong>${item.count}</strong><span class="small">Ver grúas con este check</span></button>`).join("")}</div>
     <section class="panel" style="margin-top:14px">
-      <div class="panel-header"><div><h2 class="panel-title">Detalle por grúa</h2><p class="tracking-note">${kind === "liberacion" ? 'Los totales de México e Irapuato incluyen las grúas con ambas liberaciones. «Ambas» requiere los dos checks.' : 'Cada columna muestra su check independiente; no se presupone que una etapa anterior esté completada.'} Las siniestradas están excluidas.</p></div><span class="badge">${rows.length} grúas</span></div>
+      <div class="panel-header"><div><h2 class="panel-title">Detalle por grúa</h2><p class="tracking-note">${kind === "liberacion" ? 'Los totales de México e Irapuato incluyen las grúas con ambas liberaciones. «Ambas» requiere los dos checks.' : 'Una grúa en almacén CFE ya no cuenta en tránsito, aunque ambos checks estén marcados en Drive. Curso y acuse conservan sus checks independientes.'} Las siniestradas están excluidas.</p></div><span class="badge">${rows.length} grúas</span></div>
       <div class="filters tracking-filters"><button class="ghost-button" data-action="tracking-filter" data-filter="todos" aria-pressed="${state.trackingFilter === "todos"}">Todas las grúas</button><label class="field"><span class="field-label">Buscar grúa, almacén, VIN o división</span><input class="input" data-tracking-query value="${escapeAttr(state.trackingQuery)}" placeholder="Ejemplo: 150-342" /></label><span class="badge">${state.trackingFilter === "todos" ? "Todas" : filters.find(item => item.key === state.trackingFilter)?.label || ""}</span></div>
       <div class="table-wrap"><table class="data-table tracking-table"><thead><tr><th>Grúa</th><th>N.º almacén</th><th>VIN</th><th>División</th>${stats.fields.map(field => `<th>${field.label}</th>`).join("")}${kind === "liberacion" ? "<th>Ambas liberaciones</th>" : ""}</tr></thead><tbody>
       ${rows.length ? rows.map(row => `<tr><td>${escapeHtml(row.consecutivo || "—")}</td><td><button class="ghost-button" data-action="select-equipo" data-id="${escapeAttr(row.id)}">${escapeHtml(row.control)}</button></td><td>${escapeHtml(row.vin || "—")}</td><td>${escapeHtml(row.division || "—")}</td>${stats.fields.map(field => `<td>${checkCell(row.checks?.[field.key])}</td>`).join("")}${kind === "liberacion" ? `<td>${checkCell(row.checks ? row.checks.mexico && row.checks.irapuato : undefined)}</td>` : ""}</tr>`).join("") : `<tr><td colspan="${4 + stats.fields.length + (kind === "liberacion" ? 1 : 0)}" class="empty-state">No hay grúas con este filtro.</td></tr>`}

@@ -21,6 +21,17 @@ run("applyCsvToDataset(state.data,'process:calidad_final',fixture.replace('lapem
 assert.equal(run('state.data.activityDefinitions.calidad_final.length'),2,'inspection heading must not add a production activity');
 assert.equal(run("getQualityTrackingSummary('liberacion').counts.ambas"),1);
 assert.equal(run('getDeliveredCount(state.data)'),1,'delivery stays independent of LAPEM headings');
+
+run("state.data.equipos=Array.from({length:76},(_,i)=>({id:'unit-'+i,control:'unit-'+i}));state.data.qualityTracking={available:['transito','almacen','curso','acuse'],units:Object.fromEntries(state.data.equipos.map((u,i)=>[u.id,{transito:true,almacen:i<6,curso:i===0,acuse:i===0}]))}");
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,6,1,1]);
+assert.equal(run("state.data.qualityTracking.units['unit-0'].transito"),true,'source check must remain unchanged');
+run("state.trackingFilter='transito';state.trackingQuery=''");
+assert.equal((run("renderQualityTrackingView('entrega')").match(/data-action="select-equipo"/g)||[]).length,70);
+run("state.trackingFilter='almacen'");
+assert.equal((run("renderQualityTrackingView('entrega')").match(/data-action="select-equipo"/g)||[]).length,6);
+run("state.data.qualityTracking.units['unit-0'].transito=false");
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,6,1,1],'warehouse counts with either transit checkbox value');
+
 run("state.data.qualityTracking=null");assert.equal(run("getQualityTrackingSummary('entrega').available"),false);
 assert.match(run("renderQualityTrackingView('entrega')"),/todavía no están disponibles/);
 console.log('PASS: checks independientes, ambas calculado, siniestradas y VIN duplicado, sin registro, filtros y actividades sin cambios.');
