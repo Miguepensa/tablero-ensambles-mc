@@ -17,7 +17,7 @@ const SHOW_FINANCE = false;
 const QUALITY_TRACKING_FIELDS = [
   { key: "mexico", header: "lapem_mexico", label: "LAPEM México", color: "#1f78b8" },
   { key: "irapuato", header: "lapem_irapuato", label: "LAPEM Irapuato", color: "#bd7c26" },
-  { key: "ambas", header: "liberacion_lapem", aliases: ["lapem_completo", "ambas_inspecciones"], label: "Ambas inspecciones", color: "#278b64" },
+  { key: "ambas", header: "liberacion_lapem", aliases: ["lapem_completo", "ambas_inspecciones"], label: "Unidades Liberadas en portal LAPEM", color: "#278b64" },
   { key: "transito", header: "unidades_en_transito", label: "En tránsito", color: "#1f78b8" },
   { key: "almacen", header: "unidades_en_almacen_cfe", label: "En almacén CFE", color: "#278b64" },
   { key: "curso", header: "unidades_curso", label: "Con curso", color: "#bd7c26" },
@@ -759,7 +759,7 @@ function renderDashboardView() {
     <div class="grid metrics dashboard-metrics">
       ${renderMetric("Unidades", summary.fixedTotal, "", "en-proceso")}
       ${renderMetric("Terminadas", summary.finished, "", "terminado")}
-      ${renderMetric("En proceso", summary.unfinished, "Incluye unidades pendientes de iniciar", "en-proceso")}
+      ${renderMetric("En proceso", summary.unfinished, "En proceso de ensamble", "en-proceso")}
       ${renderMetric("Siniestrado", summary.damaged, "Excluidas de operación", "siniestrado")}
     </div>
     ${state.data.equipos.some(unit => unit.missingProcessRows?.length) ? '<p class="sync-status">La grúa 172 (150-513) se incluye sin iniciar. Sus actividades se consideran pendientes hasta que aparezcan sus filas en las hojas de proceso de Drive.</p>' : ''}
