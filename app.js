@@ -825,8 +825,12 @@ function getQualityTrackingSummary(kind) {
   const rows = state.data.equipos.map(unit => {
     const rawChecks = source?.units?.[unit.id];
     const checks = rawChecks ? { ...rawChecks } : null;
-    // Warehouse arrival ends transit, without changing the source checkboxes.
-    if (kind === "entrega" && checks?.almacen) checks.transito = false;
+    // Each unit belongs only to its most advanced delivery stage. Preserve source checks.
+    if (kind === "entrega" && checks) {
+      const stages = ["acuse", "curso", "almacen", "transito"];
+      const current = stages.find(key => checks[key]);
+      stages.forEach(key => { if (key !== current && checks[key] !== undefined) checks[key] = false; });
+    }
     return { ...unit, consecutivo: source?.unitNumbers?.[unit.id] || "", checks };
   });
   const count = predicate => rows.filter(row => row.checks && predicate(row.checks)).length;
@@ -838,15 +842,10 @@ function getQualityTrackingSummary(kind) {
     missing: rows.filter(row => !row.checks).length };
 }
 
-function renderQualityTrackingPie(items) {
-  const total = items.reduce((sum, item) => sum + item.count, 0);
-  let offset = 0;
-  const stops = items.filter(item => item.count > 0).map(item => {
-    const start = offset;
-    offset += item.count / total * 100;
-    return `${item.color} ${start}% ${offset}%`;
-  });
-  return `<div class="tracking-pie ${total ? "" : "tracking-pie-empty"}" style="background:${total ? `conic-gradient(${stops.join(",")})` : "#e4eaf0"}" role="img" aria-label="${escapeAttr(items.map(item => `${item.label}: ${item.count}`).join("; "))}">${total ? "" : "Sin checks"}</div>`;
+function renderQualityTrackingBars(items, finished) {
+  const scale = Math.max(finished, ...items.map(item => item.count), 1);
+  return `<div class="tracking-finished"><span>Unidades terminadas</span><strong>${finished}</strong></div>
+    <div class="tracking-bars">${items.map(item => `<div class="tracking-bar-row"><div class="tracking-bar-label"><span>${escapeHtml(item.label)}</span><strong>${item.count}</strong></div><div class="tracking-bar-track" role="img" aria-label="${escapeAttr(item.label)}: ${item.count} grúas"><span style="width:${item.count / scale * 100}%;background:${item.color}"></span></div></div>`).join("")}</div>`;
 }
 
 function renderQualityTrackingDashboard() {
@@ -855,7 +854,7 @@ function renderQualityTrackingDashboard() {
     const title = kind === "liberacion" ? "Liberación de unidades" : "Entrega de unidades";
     return `<section class="panel tracking-chart-card" role="button" tabindex="0" data-action="view" data-view="${kind}" aria-label="Abrir ${title}">
       <div class="panel-header"><div><p class="panel-label">Pruebas calidad/finales</p><h2 class="panel-title">${title}</h2></div><span class="badge">Ver unidades →</span></div>
-      ${stats.available ? `<div class="tracking-chart-layout">${renderQualityTrackingPie(stats.items)}<div class="legend">${stats.items.map(item => renderLegendRow(item.label, `${item.count} grúas`, item.color)).join("")}</div></div>`
+      ${stats.available ? renderQualityTrackingBars(stats.items, getSummary(state.data).finished)
       : '<p class="empty-state">Los checks todavía no están disponibles en la lectura de Drive.</p>'}
     </section>`;
   }).join("")}</div>`;
@@ -1054,7 +1053,7 @@ function renderDailyProductionIndicators(item) {
       </div>
       ${tracking.deadlineKey ? '<div class="deadline-divider">Fin del plazo original · ' + formatShortDate(item.deadlineDate) + '</div>' : ''}
       ${outsideDates.length ? '<div class="after-deadline"><strong>Trabajo fuera de plazo</strong><p>Desde ' + formatShortDate(addCalendarDays(item.deadlineDate, 1)) + '. Se conserva la meta diaria original. Los días sin corte muestran “Sin dato”.</p><div class="daily-production-grid">' + outsideDates.map(date => renderDailyProductionDay(parseIsoLocalDate(date), todayKey, processHistory, item.requiredDailyMinutes)).join('') + '</div></div>' : ''}
-      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 21/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. Los cortes posteriores tampoco confirman hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
+      <p>${state.historyError ? escapeHtml(state.historyError) + ". " : ""}Cortes de Excel del 02 al 24/10/2026. El avance corresponde al intervalo entre las horas indicadas, comparado con una meta diaria de referencia; no a jornadas completas. El 06 llega hasta las 13:00; los archivos del 07 al 10 no indican hora de cierre. Los cortes del 08 al 10 no tienen cierre confirmado. El archivo recibido el lunes 12 se asignó al domingo 11 por indicación del usuario; no confirma hora de cierre. Los cortes posteriores tampoco confirman hora de cierre. El siniestrado se excluye de producción. Cero significa sin cambios registrados en actividades comparables. Los cambios del listado se excluyen. Los nuevos cortes aún se guardan en este navegador.</p>
     </div>
   `;
 }

@@ -10,7 +10,7 @@ assert.equal(run('state.data.activityDefinitions.calidad_final.length'),2,'new c
 assert.deepEqual(json("getQualityTrackingSummary('liberacion').items.map(i=>i.count)"),[1,2,1]);
 assert.equal(run("getQualityTrackingSummary('liberacion').counts.mexico"),1);
 assert.equal(run("getQualityTrackingSummary('liberacion').counts.irapuato"),2);
-assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[1,1,1,0]);
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[0,1,1,0]);
 assert.equal(run("getQualityTrackingSummary('entrega').marked"),2);
 assert.equal(run("getQualityTrackingSummary('entrega').missing"),1);
 assert.equal(run("getQualityTrackingSummary('liberacion').unmarked"),1);
@@ -23,15 +23,21 @@ assert.equal(run("getQualityTrackingSummary('liberacion').counts.ambas"),1);
 assert.equal(run('getDeliveredCount(state.data)'),1,'delivery stays independent of LAPEM headings');
 
 run("state.data.equipos=Array.from({length:76},(_,i)=>({id:'unit-'+i,control:'unit-'+i}));state.data.qualityTracking={available:['transito','almacen','curso','acuse'],units:Object.fromEntries(state.data.equipos.map((u,i)=>[u.id,{transito:true,almacen:i<6,curso:i===0,acuse:i===0}]))}");
-assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,6,1,1]);
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,5,0,1]);
 assert.equal(run("state.data.qualityTracking.units['unit-0'].transito"),true,'source check must remain unchanged');
 run("state.trackingFilter='transito';state.trackingQuery=''");
 assert.equal((run("renderQualityTrackingView('entrega')").match(/data-action="select-equipo"/g)||[]).length,70);
 run("state.trackingFilter='almacen'");
-assert.equal((run("renderQualityTrackingView('entrega')").match(/data-action="select-equipo"/g)||[]).length,6);
+assert.equal((run("renderQualityTrackingView('entrega')").match(/data-action="select-equipo"/g)||[]).length,5);
 run("state.data.qualityTracking.units['unit-0'].transito=false");
-assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,6,1,1],'warehouse counts with either transit checkbox value');
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,5,0,1],'warehouse counts with either transit checkbox value');
 
+run("state.data.qualityTracking.units['unit-1'].curso=true");
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,4,1,1]);
+run("state.data.qualityTracking.units['unit-1'].acuse=true");
+assert.deepEqual(json("getQualityTrackingSummary('entrega').items.map(i=>i.count)"),[70,4,0,2]);
+assert.equal(run("getQualityTrackingSummary('entrega').items.reduce((s,i)=>s+i.count,0)"),76);
+assert.equal(run("state.data.qualityTracking.units['unit-1'].curso"),true);
 run("state.data.qualityTracking=null");assert.equal(run("getQualityTrackingSummary('entrega').available"),false);
 assert.match(run("renderQualityTrackingView('entrega')"),/todavía no están disponibles/);
 console.log('PASS: checks independientes, ambas desde Drive, siniestradas y VIN duplicado, sin registro, filtros y actividades sin cambios.');

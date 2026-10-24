@@ -3581,3 +3581,11 @@ button {
 .tracking-filters .field { min-width:240px; flex:1; }
 .tracking-table th, .tracking-table td { white-space:nowrap; }
 @media(max-width:760px) { .tracking-chart-layout { flex-direction:column; align-items:stretch; } .tracking-pie { align-self:center; } .tracking-filters .field { min-width:0; } }
+.tracking-finished { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; margin:18px 0; background:#eef5fb; border-radius:8px; color:#174668; }
+.tracking-finished strong { font-size:30px; }
+.tracking-bars { display:grid; gap:18px; }
+.tracking-bar-label { display:flex; justify-content:space-between; gap:16px; font-size:13px; margin-bottom:8px; }
+.tracking-bar-label span { overflow-wrap:anywhere; }
+.tracking-bar-label strong { font-size:17px; }
+.tracking-bar-track { height:14px; background:#e7eef4; border-radius:7px; overflow:hidden; }
+.tracking-bar-track span { display:block; height:100%; border-radius:7px; }
