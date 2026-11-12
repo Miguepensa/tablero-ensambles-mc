@@ -928,6 +928,7 @@ function renderOperationalControlView() {
 }
 
 function renderOperationalControlCard(item, index = 0) {
+  const completed = Number.isFinite(item.currentPendingMinutes) && item.currentPendingMinutes === 0;
   const statusLabels = { ontime: "En tiempo", risk: "En riesgo", late: "Atrasado", missing: "Dato incompleto" };
   const dailyTarget = Number.isFinite(item.requiredDailyMinutes) ? formatWorkDuration(item.requiredDailyMinutes) : "-";
   const operationalDaily = Number.isFinite(item.operationalDailyMinutes) ? formatWorkDuration(item.operationalDailyMinutes) : "-";
@@ -942,7 +943,8 @@ function renderOperationalControlCard(item, index = 0) {
         : `Margen de ${staffingDifference} ${staffingDifference === 1 ? "persona" : "personas"}`;
 
   return `
-    <article class="operation-card ${item.status} ${item.id === state.operationalProcess ? "selected" : ""}" data-operational-process="${escapeAttr(item.id)}">
+    <article class="operation-card ${item.status} ${item.id === state.operationalProcess ? "selected" : ""}${completed ? " planning-completed" : ""}" data-operational-process="${escapeAttr(item.id)}">
+      ${completed ? '<div class="planning-ribbon"><span>Terminado</span></div>' : ''}
       <div class="operation-card-header">
         <div>
           <div class="operation-title-line">
